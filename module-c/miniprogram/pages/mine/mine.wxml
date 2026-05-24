@@ -1,0 +1,50 @@
+<view class="container">
+  <!-- 用户信息 -->
+  <view class="user-card">
+    <view class="avatar">U</view>
+    <view class="user-info">
+      <view class="user-id">{{openidMasked}}</view>
+      <view class="user-hint">已登录</view>
+    </view>
+  </view>
+
+  <!-- 订阅设置 -->
+  <view class="settings-block">
+    <view class="settings-title">推送订阅</view>
+
+    <view class="setting-item">
+      <view class="setting-label">
+        <view class="setting-name">每日早报</view>
+        <view class="setting-desc">每天早上 8:00 推送</view>
+      </view>
+      <switch
+        checked="{{morningEnabled}}"
+        bindchange="onToggleMorning"
+        color="#4a90d9"
+      />
+    </view>
+
+    <view class="setting-item">
+      <view class="setting-label">
+        <view class="setting-name">每日晚报</view>
+        <view class="setting-desc">每天晚上 20:00 推送</view>
+      </view>
+      <switch
+        checked="{{eveningEnabled}}"
+        bindchange="onToggleEvening"
+        color="#4a90d9"
+      />
+    </view>
+  </view>
+
+  <!-- 关于 -->
+  <view class="settings-block">
+    <view class="setting-item" bindtap="onAbout">
+      <view class="setting-label">
+        <view class="setting-name">关于</view>
+        <view class="setting-desc">AI 资讯简报 v1.0</view>
+      </view>
+      <view class="arrow">></view>
+    </view>
+  </view>
+</view>

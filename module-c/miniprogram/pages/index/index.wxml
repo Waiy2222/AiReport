@@ -1,0 +1,42 @@
+<view class="container">
+  <!-- 早报/晚报 Tab -->
+  <view class="tab-bar">
+    <view
+      class="tab-item {{currentTab === 'morning' ? 'active' : ''}}"
+      data-type="morning"
+      bindtap="onTabTap"
+    >早报</view>
+    <view
+      class="tab-item {{currentTab === 'evening' ? 'active' : ''}}"
+      data-type="evening"
+      bindtap="onTabTap"
+    >晚报</view>
+  </view>
+
+  <!-- 日期标题 -->
+  <view wx:if="{{briefing}}" class="date-header">{{dateText}} · {{currentTab === 'morning' ? '早报' : '晚报'}}</view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <!-- TL;DR 卡片列表 -->
+  <block wx:if="{{briefing && !loading}}">
+    <view wx:if="{{briefing.tl_dr.length === 0}}" class="empty-state">暂无简报</view>
+    <view
+      wx:for="{{briefing.tl_dr}}"
+      wx:key="*this"
+      class="card tl-card"
+      data-id="{{briefing.id}}"
+      bindtap="onCardTap"
+    >
+      <view class="card-index">{{index + 1}}</view>
+      <view class="card-text">{{item}}</view>
+    </view>
+  </block>
+
+  <!-- 加载失败 -->
+  <view wx:if="{{!briefing && !loading}}" class="empty-state">
+    <view>加载失败</view>
+    <button bindtap="fetchLatest" data-type="{{currentTab}}">重试</button>
+  </view>
+</view>

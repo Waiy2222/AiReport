@@ -1,16 +1,18 @@
 """Module A — 资讯抓取 (:8001)"""
-import os
+import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from db import get_pool, init_db, close_db
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Module A - News Fetcher")
 
-SOURCES = ["github", "hackernews", "rss", "reddit"]
+SOURCES = ["github", "hackernews", "rss"]  # reddit/twitter 为可选 P1，按需添加
 
 
 @app.on_event("startup")
@@ -27,8 +29,8 @@ async def shutdown():
 
 
 class FetchRequest(BaseModel):
-    batch_id: str
-    hours_back: int = 12
+    batch_id: uuid.UUID = Field(..., description="批次唯一标识")
+    hours_back: int = Field(default=12, ge=1, le=168, description="回溯小时数")
 
 
 @app.get("/health")
@@ -44,28 +46,23 @@ async def health():
 
 @app.post("/run")
 async def run(req: FetchRequest):
-    batch_id = uuid.UUID(req.batch_id)
     since = datetime.now(timezone.utc) - timedelta(hours=req.hours_back)
-
     pool = get_pool()
-    fetched = 0
-    per_source = {}
 
-    for source in SOURCES:
-        count = await _fetch_source(pool, source, since, batch_id)
-        per_source[source] = count
-        fetched += count
+    from orchestrator import run_all_scrapers, bulk_insert
 
-    status = "ok" if all(v > 0 for v in per_source.values()) else "partial"
+    # 并发抓取
+    items, per_source = await run_all_scrapers(since, req.batch_id, SOURCES)
+
+    # 批量写入数据库
+    inserted = await bulk_insert(pool, items)
+
+    all_zero = all(v == 0 for v in per_source.values())
+    status = "partial" if all_zero else "ok"
 
     return {
         "status": status,
-        "fetched": fetched,
-        "batch_id": str(batch_id),
+        "fetched": inserted,
+        "batch_id": str(req.batch_id),
         "per_source": per_source,
     }
-
-
-async def _fetch_source(pool, source: str, since: datetime, batch_id: uuid.UUID) -> int:
-    # TODO: 组员A实现真实抓取逻辑，这里用 seed_data 模拟
-    return 0  # skeleton — 占位

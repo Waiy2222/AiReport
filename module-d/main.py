@@ -1,4 +1,5 @@
 """Module D — 多平台发布 (:8004)"""
+import json
 import os
 import uuid
 
@@ -10,6 +11,22 @@ from db import get_pool, init_db, close_db
 app = FastAPI(title="Module D - Multi-Platform Publisher")
 
 PLATFORMS = ["zhihu", "csdn", "weixin_oa"]
+
+# asyncpg 将 JSONB 列返回为 Python 字符串，需手动解析
+_JSONB_FIELDS = {"tl_dr", "sections", "key_takeaways", "raw_stats"}
+
+
+def _parse_briefing(row) -> dict:
+    """将 asyncpg Record 转为 dict，并解析 JSONB 字符串字段"""
+    briefing = dict(row)
+    for field in _JSONB_FIELDS:
+        val = briefing.get(field)
+        if isinstance(val, str):
+            try:
+                briefing[field] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                pass  # 保持原值
+    return briefing
 
 
 @app.on_event("startup")
@@ -51,32 +68,19 @@ async def publish(req: PublishRequest):
 
     pool = get_pool()
 
-    # 验证简报存在
-    briefing = await pool.fetchrow(
-        "SELECT id FROM briefings WHERE id=$1", briefing_id
+    # 读取完整简报数据（JSONB 字段需解析）
+    row = await pool.fetchrow(
+        "SELECT * FROM briefings WHERE id=$1", briefing_id
     )
-    if not briefing:
+    if not row:
         raise HTTPException(404, "briefing not found")
+    briefing = _parse_briefing(row)
 
-    results = []
-    for platform in req.platforms:
-        result = await _publish_to(pool, briefing_id, platform)
-        results.append(result)
+    # 通过 orchestrator 并发发布
+    from orchestrator import publish_all
+    results = await publish_all(pool, briefing_id, briefing, req.platforms)
 
     return {
         "briefing_id": str(briefing_id),
         "results": results,
-    }
-
-
-async def _publish_to(pool, briefing_id: uuid.UUID, platform: str) -> dict:
-    # TODO: 组员D实现各平台发布逻辑:
-    #   zhihu: 知乎专栏 API
-    #   csdn: CSDN 文章 API
-    #   weixin_oa: 微信公众号草稿+发布 API
-    return {
-        "platform": platform,
-        "status": "pending",
-        "url": None,
-        "error": None,
     }

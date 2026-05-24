@@ -1,0 +1,310 @@
+openapi: "3.0.0"
+info:
+  title: AI 资讯早报/晚报智能体 - 模块接口规范
+  version: "1.0.0"
+  description: |
+    5 个模块的唯一入口接口。所有模块必须实现 GET /health。
+    所有接口输入输出均为 JSON。时间字段统一 ISO 8601 UTC。
+
+# ============================================================
+# 模块 A — 资讯抓取 (:8001)
+# ============================================================
+paths:
+  /health:
+    get:
+      summary: 健康检查（全部模块必须实现）
+      responses:
+        "200":
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                example:
+                  status: ok
+
+  /run:
+    post:
+      summary: "[A] 触发资讯抓取"
+      description: |
+        A 模块唯一业务入口。接收参数后从外部数据源抓取AI资讯，写入 raw_items 表。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batch_id, hours_back]
+              properties:
+                batch_id:
+                  type: string
+                  format: uuid
+                hours_back:
+                  type: integer
+                  default: 12
+              example:
+                batch_id: "550e8400-e29b-41d4-a716-446655440000"
+                hours_back: 12
+      responses:
+        "200":
+          description: 抓取完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, partial]
+                  fetched:
+                    type: integer
+                  batch_id:
+                    type: string
+                  per_source:
+                    type: object
+                example:
+                  status: ok
+                  fetched: 86
+                  batch_id: "550e8400-e29b-41d4-a716-446655440000"
+                  per_source:
+                    github: 25
+                    hackernews: 20
+                    rss: 35
+                    reddit: 6
+
+  # ============================================================
+  # 模块 B — AI 内容加工 (:8002)
+  # ============================================================
+  # 注：模块 B 也暴露 /run，但参数不同。
+  # 在 nginx 中按端口路由，不会冲突。
+
+  /run-b:
+    post:
+      summary: "[B] 触发 AI 内容加工"
+      description: |
+        B 模块唯一业务入口。读取 raw_items 中指定批次的数据，调用 DeepSeek 进行评分、
+        去重、摘要、背景补充，生成结构化简报写入 briefings 表。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, date, batch_id]
+              properties:
+                type:
+                  type: string
+                  enum: [morning, evening]
+                date:
+                  type: string
+                  format: date
+                batch_id:
+                  type: string
+                  format: uuid
+              example:
+                type: morning
+                date: "2026-05-24"
+                batch_id: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: 加工完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  briefing_id:
+                    type: string
+                    format: uuid
+                  stats:
+                    type: object
+                example:
+                  status: ok
+                  briefing_id: "660e8400-e29b-41d4-a716-446655440001"
+                  stats:
+                    fetched: 86
+                    scored: 86
+                    passed: 30
+                    dedup_removed: 5
+                    final_count: 25
+
+  # ============================================================
+  # 模块 C — 微信小程序 (:8003)
+  # ============================================================
+  /push:
+    post:
+      summary: "[C] 批量推送订阅消息"
+      description: |
+        C 模块业务入口。读取最新简报，向所有已订阅用户推送微信订阅消息。
+        由 E 调度器在简报生成后调用。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [morning, evening]
+              example:
+                type: morning
+      responses:
+        "200":
+          description: 推送完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  pushed:
+                    type: integer
+                  failed:
+                    type: integer
+                example:
+                  status: ok
+                  pushed: 150
+                  failed: 3
+
+  /api/briefings/latest:
+    get:
+      summary: "[C] 获取最新一期简报"
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [morning, evening]
+      responses:
+        "200":
+          description: 简报数据
+
+  /api/briefings/history:
+    get:
+      summary: "[C] 历史简报列表"
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: 分页列表
+
+  /api/subscribe:
+    post:
+      summary: "[C] 用户订阅"
+      responses:
+        "200":
+          description: 订阅成功
+
+  /api/unsubscribe:
+    post:
+      summary: "[C] 取消订阅"
+      responses:
+        "200":
+          description: 取消成功
+
+  # ============================================================
+  # 模块 D — 多平台发布 (:8004)
+  # ============================================================
+  /publish:
+    post:
+      summary: "[D] 发布简报到各平台"
+      description: |
+        D 模块唯一业务入口。读取 briefings 表中指定简报，转换格式后发布到各平台。
+        由 E 调度器在简报生成后调用。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [briefing_id]
+              properties:
+                briefing_id:
+                  type: string
+                  format: uuid
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: [zhihu, csdn, weixin_oa]
+                  default: ["zhihu", "csdn", "weixin_oa"]
+              example:
+                briefing_id: "660e8400-e29b-41d4-a716-446655440001"
+                platforms: ["zhihu", "csdn", "weixin_oa"]
+      responses:
+        "200":
+          description: 发布完成（各平台独立结果）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  briefing_id:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        platform:
+                          type: string
+                        status:
+                          type: string
+                          enum: [success, pending, failed]
+                        url:
+                          type: string
+                        error:
+                          type: string
+                example:
+                  briefing_id: "660e8400-e29b-41d4-a716-446655440001"
+                  results:
+                    - platform: zhihu
+                      status: success
+                      url: "https://zhuanlan.zhihu.com/p/xxx"
+                    - platform: csdn
+                      status: failed
+                      error: "API rate limit exceeded"
+                    - platform: weixin_oa
+                      status: success
+                      url: "https://mp.weixin.qq.com/s/xxx"
+
+  # ============================================================
+  # 模块 E — 调度管理 (:8005)
+  # ============================================================
+  /admin/trigger:
+    post:
+      summary: "[E] 手动触发全链路"
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [morning, evening]
+      responses:
+        "200":
+          description: 触发成功，返回全链路执行结果
+
+  /admin/overview:
+    get:
+      summary: "[E] 运行总览"
+      responses:
+        "200":
+          description: 今日早晚报状态、各模块最近运行记录

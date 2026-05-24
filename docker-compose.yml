@@ -1,0 +1,99 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_news}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./contracts/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./contracts/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  module-a:
+    build: ./module-a
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  module-b:
+    build: ./module-b
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  module-c:
+    build: ./module-c/backend
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+      WECHAT_APPID: ${WECHAT_APPID:-}
+      WECHAT_SECRET: ${WECHAT_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  module-d:
+    build: ./module-d
+    ports:
+      - "8004:8004"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+      ZHIHU_CLIENT_ID: ${ZHIHU_CLIENT_ID:-}
+      ZHIHU_CLIENT_SECRET: ${ZHIHU_CLIENT_SECRET:-}
+      CSDN_ACCESS_TOKEN: ${CSDN_ACCESS_TOKEN:-}
+      WEIXIN_OA_APPID: ${WEIXIN_OA_APPID:-}
+      WEIXIN_OA_SECRET: ${WEIXIN_OA_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  module-e:
+    build: ./module-e
+    ports:
+      - "8005:8005"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+      A_URL: http://module-a:8001/run
+      B_URL: http://module-b:8002/run-b
+      C_URL: http://module-c:8003/push
+      D_URL: http://module-d:8004/publish
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - module-a
+      - module-b
+      - module-c
+      - module-d
+      - module-e
+
+volumes:
+  pgdata:

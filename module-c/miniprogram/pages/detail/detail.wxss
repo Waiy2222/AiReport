@@ -1,0 +1,119 @@
+.detail-header {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.detail-type {
+  display: inline-block;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.detail-type.morning {
+  background: #fff3e0;
+  color: #e67e22;
+}
+
+.detail-type.evening {
+  background: #e8eaf6;
+  color: #5c6bc0;
+}
+
+.detail-date {
+  font-size: 13px;
+  color: #999;
+}
+
+.section-block {
+  margin-bottom: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.section-toggle {
+  font-size: 13px;
+  color: #4a90d9;
+}
+
+.tl-item {
+  display: flex;
+  align-items: baseline;
+  padding: 8px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #444;
+}
+
+.tl-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4a90d9;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.article-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.article-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+
+.article-summary {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.article-meta {
+  margin-bottom: 6px;
+}
+
+.score {
+  font-size: 11px;
+  color: #e67e22;
+  margin-left: 8px;
+}
+
+.article-link {
+  font-size: 12px;
+  color: #4a90d9;
+  padding: 4px 0;
+}
+
+.takeaways {
+  background: #f8f9ff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.takeaway-item {
+  font-size: 14px;
+  color: #5c6bc0;
+  padding: 6px 0;
+  line-height: 1.6;
+}

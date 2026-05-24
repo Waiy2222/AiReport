@@ -1,0 +1,76 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <block wx:if="{{!loading && briefing}}">
+    <!-- 标题区 -->
+    <view class="detail-header">
+      <view class="detail-type {{briefing.type}}">{{typeText}}</view>
+      <view class="detail-date">{{dateText}}</view>
+    </view>
+
+    <!-- TL;DR 要点 -->
+    <view class="section-block">
+      <view class="section-title">TL;DR 要点</view>
+      <view
+        wx:for="{{briefing.tl_dr}}"
+        wx:key="*this"
+        class="tl-item"
+      >
+        <view class="tl-dot"></view>
+        <view>{{item}}</view>
+      </view>
+    </view>
+
+    <!-- 分类条目 -->
+    <view
+      wx:for="{{briefing.sections}}"
+      wx:for-index="i"
+      wx:key="title"
+      class="section-block"
+    >
+      <view
+        class="section-header"
+        data-index="{{i}}"
+        bindtap="onSectionToggle"
+      >
+        <view class="section-title">{{item.title}}</view>
+        <view class="section-toggle">{{sectionsExpanded[i] ? '收起' : '展开'}}</view>
+      </view>
+
+      <view wx:if="{{sectionsExpanded[i]}}" class="section-items">
+        <view
+          wx:for="{{item.items}}"
+          wx:for-item="article"
+          wx:key="title"
+          class="article-card"
+        >
+          <view class="article-title">{{article.title}}</view>
+          <view class="article-summary">{{article.summary}}</view>
+          <view class="article-meta">
+            <text class="tag">{{article.source}}</text>
+            <text class="tag" wx:for="{{article.tags}}" wx:key="*this" wx:for-item="t">{{t}}</text>
+            <text class="score">评分 {{article.score}}</text>
+          </view>
+          <view
+            wx:if="{{article.url}}"
+            class="article-link"
+            data-url="{{article.url}}"
+            bindtap="onLinkTap"
+          >复制原文链接</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 关键趋势 -->
+    <view wx:if="{{briefing.key_takeaways.length > 0}}" class="section-block takeaways">
+      <view class="section-title">关键趋势信号</view>
+      <view
+        wx:for="{{briefing.key_takeaways}}"
+        wx:key="*this"
+        class="takeaway-item"
+      >{{item}}</view>
+    </view>
+  </block>
+
+  <view wx:if="{{!loading && !briefing}}" class="empty-state">简报不存在</view>
+</view>

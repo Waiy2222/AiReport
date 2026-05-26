@@ -1,0 +1,131 @@
+<!-- ============================================================
+     Index Page — Today's Briefing
+     ============================================================ -->
+<view class="page-index">
+  <!-- ===== Tab Switcher ===== -->
+  <view class="tab-bar">
+    <view
+      class="tab-item {{activeTab === 'morning' ? 'tab-active' : ''}}"
+      data-tab="morning"
+      bindtap="onTabTap"
+    >
+      <text class="tab-icon">&#9728;</text>
+      <text class="tab-label">早报</text>
+    </view>
+    <view
+      class="tab-item {{activeTab === 'evening' ? 'tab-active' : ''}}"
+      data-tab="evening"
+      bindtap="onTabTap"
+    >
+      <text class="tab-icon">&#9790;</text>
+      <text class="tab-label">晚报</text>
+    </view>
+  </view>
+
+  <!-- ===== Loading State ===== -->
+  <view wx:if="{{loading && !briefing}}" class="loading-container">
+    <view class="loading-spinner"></view>
+    <text class="text-caption mt-20">正在加载最新简报...</text>
+  </view>
+
+  <!-- ===== Error State ===== -->
+  <view wx:elif="{{error && !briefing}}" class="empty-state">
+    <text class="empty-icon">&#128543;</text>
+    <text class="empty-text">{{error}}</text>
+    <view class="btn btn-outline btn-sm mt-30" bindtap="fetchBriefing">
+      点击重试
+    </view>
+  </view>
+
+  <!-- ===== Briefing Content ===== -->
+  <block wx:else>
+    <!-- Subscribe Prompt (shown when not subscribed) -->
+    <view
+      wx:if="{{!isSubscribed}}"
+      class="subscribe-banner card"
+      bindtap="onSubscribeTap"
+    >
+      <view class="flex-between">
+        <view class="flex-row">
+          <text class="banner-icon">&#128276;</text>
+          <view>
+            <view class="title-sm">开启推送订阅</view>
+            <view class="text-caption mt-10">不错过每一次AI资讯简报</view>
+          </view>
+        </view>
+        <text class="banner-arrow">&#8250;</text>
+      </view>
+    </view>
+
+    <!-- Briefing Card -->
+    <view class="briefing-card card" bindtap="onBriefingTap">
+      <!-- Header -->
+      <view class="card-header flex-between">
+        <view class="flex-row">
+          <view class="badge badge-{{briefing.type}}">
+            {{briefing.type === 'morning' ? '早报' : '晚报'}}
+          </view>
+          <text class="card-date text-caption ml-10">{{briefing.date}}</text>
+        </view>
+        <text class="card-arrow text-muted">查看详情 &#8250;</text>
+      </view>
+
+      <view class="divider"></view>
+
+      <!-- TL;DR Section -->
+      <view class="tldr-section" wx:if="{{tlDrList.length > 0}}">
+        <view class="section-label">
+          <text class="label-icon">&#9889;</text>
+          <text class="label-text">TL;DR 要点速览</text>
+        </view>
+        <view class="tldr-list">
+          <view
+            wx:for="{{tlDrList}}"
+            wx:key="index"
+            class="tldr-item flex-row"
+            data-index="{{index}}"
+            bindtap="onTlDrTap"
+          >
+            <view class="tldr-dot"></view>
+            <text class="tldr-text">{{item}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Key Takeaways -->
+      <view
+        class="takeaways-section"
+        wx:if="{{keyTakeaways.length > 0}}"
+      >
+        <view class="section-label">
+          <text class="label-icon">&#11088;</text>
+          <text class="label-text">关键摘要</text>
+        </view>
+        <view class="takeaway-list">
+          <view
+            wx:for="{{keyTakeaways}}"
+            wx:key="idx"
+            wx:for-index="idx"
+            wx:for-item="item"
+            class="takeaway-item"
+          >
+            <text class="takeaway-num">{{idx + 1}}.</text>
+            <text class="takeaway-text">{{item}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Generated time -->
+      <view class="card-footer text-caption">
+        生成时间：{{briefing.generated_at}}
+      </view>
+    </view>
+
+    <!-- Action buttons -->
+    <view class="action-row" wx:if="{{!isSubscribed}}">
+      <view class="btn btn-primary btn-block" bindtap="onSubscribeTap">
+        &#128276;  订阅推送通知
+      </view>
+    </view>
+  </block>
+</view>

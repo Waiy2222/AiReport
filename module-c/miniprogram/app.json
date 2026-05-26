@@ -1,0 +1,42 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/detail/detail",
+    "pages/history/history",
+    "pages/mine/mine"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#1a6fb5",
+    "navigationBarTitleText": "AI资讯简报",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f6fa"
+  },
+  "tabBar": {
+    "color": "#8a8d91",
+    "selectedColor": "#1a6fb5",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "今日简报",
+        "iconPath": "images/tab-news.png",
+        "selectedIconPath": "images/tab-news-active.png"
+      },
+      {
+        "pagePath": "pages/history/history",
+        "text": "历史记录",
+        "iconPath": "images/tab-history.png",
+        "selectedIconPath": "images/tab-history-active.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "images/tab-mine.png",
+        "selectedIconPath": "images/tab-mine-active.png"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

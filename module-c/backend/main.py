@@ -22,6 +22,13 @@ async def shutdown():
     await close_db()
 
 
+def _get_pool_or_503():
+    try:
+        return get_pool()
+    except RuntimeError:
+        raise HTTPException(503, "database not initialized")
+
+
 class PushRequest(BaseModel):
     type: str  # morning / evening
 
@@ -56,7 +63,7 @@ async def get_latest(type: str = Query(..., description="morning or evening")):
     if type not in ("morning", "evening"):
         raise HTTPException(400, "type must be morning or evening")
 
-    pool = get_pool()
+    pool = _get_pool_or_503()
     row = await pool.fetchrow(
         "SELECT * FROM briefings WHERE type=$1 ORDER BY date DESC LIMIT 1",
         type,
@@ -77,7 +84,7 @@ async def get_latest(type: str = Query(..., description="morning or evening")):
 
 @app.get("/api/briefings/history")
 async def get_history(page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100)):
-    pool = get_pool()
+    pool = _get_pool_or_503()
     offset = (page - 1) * size
     rows = await pool.fetch(
         "SELECT id, type, date, tl_dr, generated_at FROM briefings ORDER BY date DESC OFFSET $1 LIMIT $2",
@@ -110,7 +117,7 @@ class SubscribeRequest(BaseModel):
 
 @app.post("/api/subscribe")
 async def subscribe(req: SubscribeRequest):
-    pool = get_pool()
+    pool = _get_pool_or_503()
     await pool.execute(
         """INSERT INTO subscriptions (openid, morning_enabled, evening_enabled)
            VALUES ($1, $2, $3)
@@ -127,7 +134,7 @@ class UnsubscribeRequest(BaseModel):
 
 @app.post("/api/unsubscribe")
 async def unsubscribe(req: UnsubscribeRequest):
-    pool = get_pool()
+    pool = _get_pool_or_503()
     result = await pool.execute(
         "UPDATE subscriptions SET subscribed=false WHERE openid=$1",
         req.openid,

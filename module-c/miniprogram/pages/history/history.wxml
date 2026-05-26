@@ -1,0 +1,70 @@
+<!-- ============================================================
+     History Page — Paginated Briefing Archives
+     ============================================================ -->
+<view class="page-history">
+  <!-- Loading -->
+  <view wx:if="{{loading && items.length === 0}}" class="loading-container">
+    <view class="loading-spinner"></view>
+    <text class="text-caption mt-20">加载中...</text>
+  </view>
+
+  <!-- Error -->
+  <view wx:elif="{{error && items.length === 0}}" class="empty-state">
+    <text class="empty-icon">&#128543;</text>
+    <text class="empty-text">{{error}}</text>
+    <view class="btn btn-outline btn-sm mt-30" bindtap="fetchHistory">
+      点击重试
+    </view>
+  </view>
+
+  <!-- Empty -->
+  <view wx:elif="{{items.length === 0 && !loading}}" class="empty-state">
+    <text class="empty-icon">&#128240;</text>
+    <text class="empty-text">暂无历史简报</text>
+    <text class="empty-sub text-caption">简报生成后将在这里显示</text>
+  </view>
+
+  <!-- List -->
+  <view wx:else class="history-list">
+    <view
+      wx:for="{{items}}"
+      wx:key="id"
+      class="history-item card"
+      data-id="{{item.id}}"
+      data-type="{{item.type}}"
+      bindtap="onItemTap"
+    >
+      <!-- Item Header -->
+      <view class="item-header flex-between">
+        <view class="flex-row">
+          <view class="badge badge-{{item.type}}">
+            {{item.type === 'morning' ? '早报' : '晚报'}}
+          </view>
+          <text class="item-date">{{item.date}}</text>
+        </view>
+        <text class="item-arrow text-muted">&#8250;</text>
+      </view>
+
+      <!-- TL;DR Preview -->
+      <view class="item-preview" wx:if="{{item.tlDrPreview}}">
+        <text class="preview-label">TL;DR</text>
+        <text class="preview-text">{{item.tlDrPreview}}</text>
+      </view>
+
+      <!-- Footer meta -->
+      <view class="item-footer text-caption">
+        <text>生成时间：{{item.generated_at}}</text>
+      </view>
+    </view>
+
+    <!-- Load More State -->
+    <view wx:if="{{loadingMore}}" class="loading-more">
+      <view class="loading-spinner-small"></view>
+      <text>加载更多...</text>
+    </view>
+
+    <view wx:elif="{{!hasMore}}" class="no-more">
+      — 已加载全部 {{total}} 条记录 —
+    </view>
+  </view>
+</view>

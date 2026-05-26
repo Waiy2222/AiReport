@@ -1,12 +1,16 @@
 """Module B — AI 内容加工 (:8002)"""
 import os
 import uuid
+import logging
 from datetime import date
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from db import get_pool, init_db, close_db
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [B] %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Module B - AI Content Processor")
 
@@ -41,6 +45,13 @@ async def health():
         return {"status": "ok", "db": "disconnected"}
 
 
+def _get_pool_or_503():
+    try:
+        return get_pool()
+    except RuntimeError:
+        raise HTTPException(503, "database not initialized")
+
+
 @app.post("/run-b")
 async def run_b(req: ProcessRequest):
     if req.type not in ("morning", "evening"):
@@ -48,29 +59,19 @@ async def run_b(req: ProcessRequest):
     briefing_date = date.fromisoformat(req.date)
     batch_id = uuid.UUID(req.batch_id)
 
-    pool = get_pool()
+    pool = _get_pool_or_503()
 
-    # TODO: 组员B实现完整 AI 加工流水线:
-    #   1. 从 raw_items 读取指定 batch 的数据
-    #   2. DeepSeek 评分 (ai_score)
-    #   3. 过滤低分 (threshold >= 6)
-    #   4. AI 去重 (cross-source + topic dedup)
-    #   5. 背景补充 (enrich)
-    #   6. 生成 tl_dr / sections / key_takeaways
-    #   7. INSERT INTO briefings
+    from ai.pipeline import run_pipeline
 
-    stats = {
-        "fetched": 0,
-        "scored": 0,
-        "passed": 0,
-        "dedup_removed": 0,
-        "final_count": 0,
-    }
+    logger.info("Starting pipeline: type=%s date=%s batch=%s",
+                req.type, req.date, req.batch_id)
 
-    briefing_id = uuid.uuid4()
+    result = await run_pipeline(
+        pool=pool,
+        batch_id=str(batch_id),
+        briefing_type=req.type,
+        briefing_date=briefing_date,
+    )
 
-    return {
-        "status": "ok",
-        "briefing_id": str(briefing_id),
-        "stats": stats,
-    }
+    logger.info("Pipeline complete: %s", result.get("stats"))
+    return result

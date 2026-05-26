@@ -1,0 +1,249 @@
+/* ============================================================
+   Global Styles — AI资讯简报 Mini Program
+   Blue/white color scheme, card-based layout, WeChat-like UI
+   ============================================================ */
+
+/* ---- Reset & Base ---- */
+page {
+  background-color: #f5f6fa;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  color: #333;
+  line-height: 1.6;
+}
+
+/* ---- Colors ---- */
+/* Primary:   #1a6fb5 (blue) */
+/* Secondary: #3b9ad5 (lighter blue) */
+/* Accent:    #ff8c42 (orange, for highlights) */
+/* Success:   #52c41a (green) */
+/* Warning:   #faad14 (gold/star) */
+/* Text:      #333 (dark), #666 (medium), #999 (light) */
+/* Bg:        #f5f6fa (page), #fff (card) */
+
+/* ---- Typography ---- */
+.title-lg {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.title-md {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.title-sm {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+}
+.text-body {
+  font-size: 28rpx;
+  color: #555;
+  line-height: 1.7;
+}
+.text-caption {
+  font-size: 24rpx;
+  color: #999;
+}
+.text-primary {
+  color: #1a6fb5;
+}
+.text-accent {
+  color: #ff8c42;
+}
+.text-muted {
+  color: #999;
+}
+.fw-bold {
+  font-weight: 700;
+}
+
+/* ---- Layout Utilities ---- */
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.flex-between {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.flex-wrap {
+  flex-wrap: wrap;
+}
+.flex-1 {
+  flex: 1;
+}
+
+/* ---- Spacing ---- */
+.mt-10 { margin-top: 10rpx; }
+.mt-20 { margin-top: 20rpx; }
+.mt-30 { margin-top: 30rpx; }
+.mb-10 { margin-bottom: 10rpx; }
+.mb-20 { margin-bottom: 20rpx; }
+.mb-30 { margin-bottom: 30rpx; }
+.p-20 { padding: 20rpx; }
+.p-30 { padding: 30rpx; }
+.px-20 { padding-left: 20rpx; padding-right: 20rpx; }
+.px-30 { padding-left: 30rpx; padding-right: 30rpx; }
+
+/* ---- Card ---- */
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+  margin: 20rpx 30rpx;
+  padding: 30rpx;
+  overflow: hidden;
+}
+
+/* ---- Badge / Tags ---- */
+.badge {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.badge-morning {
+  background: #fff3e0;
+  color: #e67e22;
+}
+.badge-evening {
+  background: #e8eaf6;
+  color: #3f51b5;
+}
+
+/* ---- Buttons ---- */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80rpx;
+  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  padding: 0 50rpx;
+  border: none;
+  transition: opacity 0.2s;
+}
+.btn::after {
+  border: none;
+}
+.btn-primary {
+  background: linear-gradient(135deg, #1a6fb5, #3b9ad5);
+  color: #fff;
+}
+.btn-primary:active {
+  opacity: 0.85;
+}
+.btn-outline {
+  background: #fff;
+  color: #1a6fb5;
+  border: 2rpx solid #1a6fb5;
+}
+.btn-outline:active {
+  background: #f0f6fb;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: #fff;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-sm {
+  height: 56rpx;
+  font-size: 24rpx;
+  padding: 0 30rpx;
+  border-radius: 28rpx;
+}
+
+/* ---- Section Header ---- */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 30rpx;
+}
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+  position: relative;
+  padding-left: 20rpx;
+}
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6rpx;
+  height: 28rpx;
+  background: #1a6fb5;
+  border-radius: 3rpx;
+}
+
+/* ---- Divider ---- */
+.divider {
+  height: 1rpx;
+  background: #eee;
+  margin: 20rpx 0;
+}
+
+/* ---- Empty State ---- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+}
+.empty-state .empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 20rpx;
+}
+.empty-state .empty-text {
+  font-size: 28rpx;
+  color: #bbb;
+}
+
+/* ---- Star Rating ---- */
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+}
+.star {
+  font-size: 28rpx;
+  color: #ddd;
+}
+.star.active {
+  color: #faad14;
+}
+.star.half {
+  position: relative;
+  color: #faad14;
+}
+
+/* ---- Loading ---- */
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30rpx 0;
+  font-size: 24rpx;
+  color: #999;
+}
+.no-more {
+  text-align: center;
+  padding: 30rpx 0;
+  font-size: 24rpx;
+  color: #ccc;
+}

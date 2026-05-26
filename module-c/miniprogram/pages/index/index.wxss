@@ -1,0 +1,225 @@
+/* ============================================================
+   Index Page Styles
+   ============================================================ */
+
+.page-index {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+}
+
+/* ---- Tab Switcher ---- */
+.tab-bar {
+  display: flex;
+  background: #fff;
+  padding: 0;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  position: relative;
+  transition: color 0.25s;
+}
+
+.tab-item .tab-icon {
+  font-size: 36rpx;
+  margin-right: 10rpx;
+}
+
+.tab-item .tab-label {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #888;
+}
+
+.tab-active .tab-label {
+  color: #1a6fb5;
+}
+
+.tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60rpx;
+  height: 6rpx;
+  background: #1a6fb5;
+  border-radius: 3rpx;
+}
+
+/* ---- Subscribe Banner ---- */
+.subscribe-banner {
+  background: linear-gradient(135deg, #1a6fb5, #3b9ad5);
+  color: #fff;
+  box-shadow: 0 4rpx 16rpx rgba(26, 111, 181, 0.25);
+}
+
+.subscribe-banner .banner-icon {
+  font-size: 48rpx;
+  margin-right: 20rpx;
+}
+
+.subscribe-banner .title-sm {
+  color: #fff;
+  font-size: 30rpx;
+}
+
+.subscribe-banner .text-caption {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.subscribe-banner .banner-arrow {
+  font-size: 40rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ---- Briefing Card ---- */
+.briefing-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.briefing-card .card-header {
+  padding: 24rpx 30rpx;
+}
+
+.briefing-card .divider {
+  margin: 0;
+}
+
+.briefing-card .card-footer {
+  padding: 20rpx 30rpx;
+  background: #fafbfc;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.card-date {
+  margin-left: 16rpx;
+}
+
+.card-arrow {
+  font-size: 26rpx;
+}
+
+.ml-10 {
+  margin-left: 10rpx;
+}
+
+/* ---- Section Label ---- */
+.section-label {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 30rpx 10rpx;
+}
+
+.label-icon {
+  font-size: 32rpx;
+  margin-right: 12rpx;
+}
+
+.label-text {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+/* ---- TL;DR List ---- */
+.tldr-section {
+  padding-bottom: 10rpx;
+}
+
+.tldr-list {
+  padding: 0 30rpx 16rpx;
+}
+
+.tldr-item {
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+
+.tldr-item:last-child {
+  border-bottom: none;
+}
+
+.tldr-dot {
+  width: 12rpx;
+  height: 12rpx;
+  min-width: 12rpx;
+  border-radius: 50%;
+  background: #1a6fb5;
+  margin-right: 16rpx;
+}
+
+.tldr-text {
+  font-size: 28rpx;
+  color: #444;
+  line-height: 1.6;
+  flex: 1;
+}
+
+/* ---- Takeaways ---- */
+.takeaways-section {
+  padding-bottom: 16rpx;
+}
+
+.takeaway-list {
+  padding: 0 30rpx 16rpx;
+}
+
+.takeaway-item {
+  display: flex;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+
+.takeaway-item:last-child {
+  border-bottom: none;
+}
+
+.takeaway-num {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1a6fb5;
+  min-width: 40rpx;
+}
+
+.takeaway-text {
+  font-size: 28rpx;
+  color: #444;
+  line-height: 1.6;
+  flex: 1;
+}
+
+/* ---- Action Row ---- */
+.action-row {
+  margin: 20rpx 30rpx 0;
+}
+
+/* ---- Loading ---- */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 160rpx 0;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #e0e0e0;
+  border-top-color: #1a6fb5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

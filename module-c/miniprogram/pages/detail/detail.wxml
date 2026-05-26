@@ -1,0 +1,147 @@
+<!-- ============================================================
+     Detail Page — Full Briefing View
+     ============================================================ -->
+<view class="page-detail">
+  <!-- Loading -->
+  <view wx:if="{{loading}}" class="loading-container">
+    <view class="loading-spinner"></view>
+    <text class="text-caption mt-20">加载中...</text>
+  </view>
+
+  <!-- Error -->
+  <view wx:elif="{{error}}" class="empty-state">
+    <text class="empty-icon">&#128543;</text>
+    <text class="empty-text">{{error}}</text>
+    <view class="btn btn-outline btn-sm mt-30" bindtap="fetchDetail">
+      点击重试
+    </view>
+  </view>
+
+  <!-- Content -->
+  <view wx:else class="content">
+    <!-- Header -->
+    <view class="detail-header card">
+      <view class="flex-between mb-20">
+        <view class="badge badge-{{briefing.type}}">
+          {{briefing.type === 'morning' ? 'AI 早报' : 'AI 晚报'}}
+        </view>
+        <text class="text-caption">{{briefing.date}}</text>
+      </view>
+
+      <view class="detail-meta text-caption">
+        生成时间：{{briefing.generated_at}}
+      </view>
+
+      <!-- Share button row -->
+      <view class="share-row">
+        <button class="btn btn-outline btn-sm" open-type="share">
+          &#128279; 分享给好友
+        </button>
+      </view>
+    </view>
+
+    <!-- TL;DR Section -->
+    <view class="card" wx:if="{{tlDrList.length > 0}}">
+      <view class="block-title">
+        <text class="block-icon">&#9889;</text>
+        <text>TL;DR 要点速览</text>
+      </view>
+      <view class="tldr-list">
+        <view wx:for="{{tlDrList}}" wx:key="index" class="tldr-point">
+          <text class="tldr-index">{{index + 1}}.</text>
+          <text class="tldr-content">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Key Takeaways -->
+    <view class="card" wx:if="{{keyTakeaways.length > 0}}">
+      <view class="block-title">
+        <text class="block-icon">&#11088;</text>
+        <text>关键摘要</text>
+      </view>
+      <view class="takeaway-list">
+        <view wx:for="{{keyTakeaways}}" wx:key="idx" wx:for-index="idx" wx:for-item="item" class="takeaway-point">
+          <text class="takeaway-num">{{idx + 1}}.</text>
+          <text class="takeaway-content">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Sections -->
+    <view
+      wx:for="{{sections}}"
+      wx:key="index"
+      class="section-card card"
+    >
+      <!-- Section Header (collapsible) -->
+      <view
+        class="section-header flex-between"
+        data-index="{{index}}"
+        bindtap="onSectionToggle"
+      >
+        <view class="flex-row">
+          <text class="section-num">{{index + 1}}</text>
+          <text class="section-title-text">{{item.title}}</text>
+          <text class="item-count">({{item.items.length}}条)</text>
+        </view>
+        <text class="collapse-icon {{sectionCollapsed[index] ? '' : 'collapsed'}}">
+          &#9660;
+        </text>
+      </view>
+
+      <!-- Section Items (collapsible content) -->
+      <view class="section-body {{sectionCollapsed[index] ? 'hidden' : ''}}">
+        <view
+          wx:for="{{item.items}}"
+          wx:for-item="news"
+          wx:key="idx"
+          wx:for-index="newsIdx"
+          class="news-item"
+        >
+          <view class="news-header flex-between">
+            <text class="news-title">{{news.title}}</text>
+          </view>
+
+          <view class="news-summary text-body" wx:if="{{news.summary}}">
+            {{news.summary}}
+          </view>
+
+          <view class="news-meta flex-between">
+            <!-- Score (stars) -->
+            <view class="stars">
+              <text wx:for="{{news.scoreDisplay.full}}" wx:key="*" class="star active">&#9733;</text>
+              <text wx:if="{{news.scoreDisplay.half > 0}}" class="star active half">&#9733;</text>
+              <text wx:for="{{news.scoreDisplay.empty}}" wx:key="*" class="star">&#9734;</text>
+              <text class="score-text">{{news.scoreDisplay.text}}</text>
+            </view>
+
+            <!-- Source tag -->
+            <view class="source-tag" wx:if="{{news.source}}">
+              <text>{{news.source}}</text>
+            </view>
+          </view>
+
+          <!-- Clickable URL -->
+          <view
+            wx:if="{{news.url}}"
+            class="news-url"
+            data-url="{{news.url}}"
+            bindtap="onItemUrlTap"
+          >
+            <text class="url-icon">&#128279;</text>
+            <text class="url-text">{{news.url}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- No sections fallback -->
+    <view class="empty-state" wx:if="{{sections.length === 0}}">
+      <text class="empty-text">暂无详细板块内容</text>
+    </view>
+
+    <!-- Bottom safe space -->
+    <view style="height: 40rpx;"></view>
+  </view>
+</view>

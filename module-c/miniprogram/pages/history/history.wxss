@@ -1,0 +1,107 @@
+/* ============================================================
+   History Page Styles
+   ============================================================ */
+
+.page-history {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+}
+
+/* ---- Loading Spinners ---- */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 160rpx 0;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #e0e0e0;
+  border-top-color: #1a6fb5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-spinner-small {
+  width: 32rpx;
+  height: 32rpx;
+  border: 3rpx solid #e0e0e0;
+  border-top-color: #1a6fb5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 12rpx;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- History List ---- */
+.history-list {
+  padding-bottom: 40rpx;
+}
+
+/* ---- History Item ---- */
+.history-item {
+  padding: 0;
+  overflow: hidden;
+}
+
+.history-item .item-header {
+  padding: 24rpx 30rpx;
+}
+
+.item-date {
+  font-size: 28rpx;
+  color: #666;
+  margin-left: 16rpx;
+}
+
+.item-arrow {
+  font-size: 32rpx;
+}
+
+/* ---- Preview ---- */
+.item-preview {
+  padding: 0 30rpx 20rpx;
+  display: flex;
+  align-items: flex-start;
+}
+
+.preview-label {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #fff;
+  background: #1a6fb5;
+  padding: 2rpx 10rpx;
+  border-radius: 4rpx;
+  margin-right: 14rpx;
+  margin-top: 4rpx;
+  flex-shrink: 0;
+}
+
+.preview-text {
+  font-size: 26rpx;
+  color: #555;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  flex: 1;
+}
+
+/* ---- Footer ---- */
+.item-footer {
+  padding: 14rpx 30rpx;
+  background: #fafbfc;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+/* ---- Empty Sub ---- */
+.empty-sub {
+  margin-top: 8rpx;
+}

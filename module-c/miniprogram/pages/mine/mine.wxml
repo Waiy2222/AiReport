@@ -1,0 +1,107 @@
+<!-- ============================================================
+     Mine Page — Subscription Settings & About
+     ============================================================ -->
+<view class="page-mine">
+  <!-- User Info Header -->
+  <view class="user-header">
+    <view class="avatar-wrapper">
+      <text class="avatar-icon">&#128100;</text>
+    </view>
+    <view class="user-info">
+      <text class="user-name">AI资讯用户</text>
+      <text class="user-status text-caption" style="color: rgba(255,255,255,0.8);">
+        {{isSubscribed ? '已订阅推送' : '未订阅推送'}}
+      </text>
+    </view>
+  </view>
+
+  <!-- Subscription Status Card -->
+  <view class="card subscription-card">
+    <view class="card-header-row flex-between">
+      <view class="flex-row">
+        <text class="card-header-icon">&#128276;</text>
+        <text class="title-md">推送订阅</text>
+      </view>
+      <view class="status-dot {{isSubscribed ? 'dot-active' : 'dot-inactive'}}"></view>
+    </view>
+
+    <view class="divider"></view>
+
+    <!-- Morning Toggle -->
+    <view class="setting-row flex-between">
+      <view class="flex-row">
+        <text class="setting-icon">&#9728;</text>
+        <view>
+          <text class="title-sm">早报推送</text>
+          <view class="text-caption mt-10">每天上午推送AI早报</view>
+        </view>
+      </view>
+      <switch
+        checked="{{morningEnabled}}"
+        disabled="{{!isSubscribed}}"
+        bindchange="onMorningToggle"
+        color="#1a6fb5"
+      />
+    </view>
+
+    <!-- Evening Toggle -->
+    <view class="setting-row flex-between">
+      <view class="flex-row">
+        <text class="setting-icon">&#9790;</text>
+        <view>
+          <text class="title-sm">晚报推送</text>
+          <view class="text-caption mt-10">每天傍晚推送AI晚报</view>
+        </view>
+      </view>
+      <switch
+        checked="{{eveningEnabled}}"
+        disabled="{{!isSubscribed}}"
+        bindchange="onEveningToggle"
+        color="#1a6fb5"
+      />
+    </view>
+
+    <!-- Subscribe / Unsubscribe Button -->
+    <view class="subscribe-action">
+      <view
+        wx:if="{{!isSubscribed}}"
+        class="btn btn-primary btn-block"
+        bindtap="onSubscribeTap"
+      >
+        {{subscribing ? '订阅中...' : '立即订阅推送'}}
+      </view>
+      <view
+        wx:else
+        class="btn btn-danger btn-block"
+        bindtap="onUnsubscribeTap"
+      >
+        {{unsubscribing ? '取消中...' : '取消订阅'}}
+      </view>
+    </view>
+  </view>
+
+  <!-- About Card -->
+  <view class="card about-card">
+    <view class="about-row flex-between" bindtap="onAboutTap">
+      <view class="flex-row">
+        <text class="about-icon">&#9432;</text>
+        <text class="title-sm">关于我们</text>
+      </view>
+      <text class="text-muted about-arrow">&#8250;</text>
+    </view>
+    <view class="divider"></view>
+    <view class="about-row flex-between" bindtap="onFeedbackTap">
+      <view class="flex-row">
+        <text class="about-icon">&#128172;</text>
+        <text class="title-sm">意见反馈</text>
+      </view>
+      <text class="text-muted about-arrow">&#8250;</text>
+    </view>
+  </view>
+
+  <!-- Footer Info -->
+  <view class="footer-info text-caption">
+    <text>AI资讯简报 v1.0.0</text>
+    <text class="mt-10">AI News Briefing Team</text>
+  </view>
+</view>

@@ -1,9 +1,9 @@
 -- ============================================================
--- AI 资讯早报/晚报智能体 · 种子数据
--- 让每个模块拿到即可独立开发，不需要等其他模块完成
+-- AI 璧勮��鏃╂姤/鏅氭姤鏅鸿兘浣� 路 绉嶅瓙鏁版嵁
+-- 璁╂瘡涓�妯″潡鎷垮埌鍗冲彲鐙�绔嬪紑鍙戯紝涓嶉渶瑕佺瓑鍏朵粬妯″潡瀹屾垚
 -- ============================================================
 
--- ── raw_items: 30条假 AI 资讯（模拟 A 模块抓取结果，供 B 开发用）────
+-- 鈹�鈹� raw_items: 30鏉″亣 AI 璧勮��锛堟ā鎷� A 妯″潡鎶撳彇缁撴灉锛屼緵 B 寮�鍙戠敤锛夆攢鈹�鈹�鈹�
 INSERT INTO raw_items (id, source, title, url, content, author, published_at, batch_id) VALUES
 ('a0000001-0000-0000-0000-000000000001', 'github', 'LangChain发布v0.3版本，新增多Agent协作能力', 'https://github.com/langchain-ai/langchain/releases/tag/v0.3.0', 'LangChain v0.3.0 正式发布，新增MultiAgentCoordinator类，支持多个Agent之间的消息传递和任务分配。', 'langchain-ai', '2026-05-24 02:00:00+00', 'a0000000-0000-0000-0000-000000000001'),
 ('a0000001-0000-0000-0000-000000000002', 'github', 'Open Source LLM Tool Calling Framework: Gorilla v2.0', 'https://github.com/ShishirPatil/gorilla', 'Gorilla v2.0 发布，新增对Claude、Gemini、DeepSeek等模型的tool calling支持，准确率提升至95%。', 'ShishirPatil', '2026-05-24 04:30:00+00', 'a0000000-0000-0000-0000-000000000001'),
@@ -36,67 +36,67 @@ INSERT INTO raw_items (id, source, title, url, content, author, published_at, ba
 ('a0000001-0000-0000-0000-000000000029', 'rss', '欧盟AI法案第二阶段正式实施：高风险AI系统需强制备案', 'https://techcrunch.com/2026/05/24/eu-ai-act-phase-2', '欧盟AI法案第二阶段生效，覆盖Agent系统、自动驾驶和医疗AI。要求透明性报告、人工监督机制和风险评估。违规最高罚全球营收的7%。', 'TechCrunch', '2026-05-24 08:00:00+00', 'a0000000-0000-0000-0000-000000000001'),
 ('a0000001-0000-0000-0000-000000000030', 'github', 'PaddlePaddle发布飞桨3.0：中文AI开发者的首选框架', 'https://github.com/PaddlePaddle/Paddle', '百度飞桨3.0发布，全面支持大模型训练和推理，新增AutoParallel分布式训练，中文NLP预训练模型库扩充至500+。', 'PaddlePaddle', '2026-05-24 00:00:00+00', 'a0000000-0000-0000-0000-000000000001');
 
--- ── briefings: 3 期假简报（模拟 B 模块输出，供 C/D 开发用）─────────
+-- 鈹�鈹� briefings: 3 鏈熷亣绠�鎶ワ紙妯℃嫙 B 妯″潡杈撳嚭锛屼緵 C/D 寮�鍙戠敤锛夆攢鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�
 INSERT INTO briefings (id, type, date, language, tl_dr, sections, key_takeaways, raw_stats) VALUES
 ('b0000001-0000-0000-0000-000000000001', 'morning', '2026-05-24', 'zh',
-  '["DeepSeek-V4技术报告引发全球关注，MoE架构370B参数开源，训练成本仅500万美元",
-    "Meta开源Llama-4-R1推理增强模型，MIT许可证，多项基准达GPT-5同级",
-    "Anthropic发布Claude Opus 4.7，SWE-Bench Verified准确率85%",
-    "OpenAI意外开源GPT-OSS 7B推理模型，可在消费级硬件运行",
-    "Google DeepMind发布Gemini 3.0，首次原生支持Agent API",
-    "欧盟AI法案第二阶段生效，高风险AI系统需强制备案",
-    "YC 2026夏季批次AI初创占比82%，Agent工具和垂直应用成热点",
-    "vLLM v0.7推理吞吐量提升2倍，FP8量化支持70B模型单卡部署",
-    "CrewAI v1.0和AutoGPT v0.6同日发布，多Agent框架竞争白热化",
-    "HuggingFace Transformers v5.0统一多模态API架构"]'::jsonb,
+  '["DeepSeek-V4鎶�鏈�鎶ュ憡寮曞彂鍏ㄧ悆鍏虫敞锛孧oE鏋舵瀯370B鍙傛暟寮�婧愶紝璁�缁冩垚鏈�浠�500涓囩編鍏�",
+    "Meta寮�婧怢lama-4-R1鎺ㄧ悊澧炲己妯″瀷锛孧IT璁稿彲璇侊紝澶氶」鍩哄噯杈綠PT-5鍚岀骇",
+    "Anthropic鍙戝竷Claude Opus 4.7锛孲WE-Bench Verified鍑嗙‘鐜�85%",
+    "OpenAI鎰忓�栧紑婧怗PT-OSS 7B鎺ㄧ悊妯″瀷锛屽彲鍦ㄦ秷璐圭骇纭�浠惰繍琛�",
+    "Google DeepMind鍙戝竷Gemini 3.0锛岄�栨�″師鐢熸敮鎸丄gent API",
+    "娆х洘AI娉曟�堢��浜岄樁娈电敓鏁堬紝楂橀�庨櫓AI绯荤粺闇�寮哄埗澶囨��",
+    "YC 2026澶忓�ｆ壒娆�AI鍒濆垱鍗犳瘮82%锛孉gent宸ュ叿鍜屽瀭鐩村簲鐢ㄦ垚鐑�鐐�",
+    "vLLM v0.7鎺ㄧ悊鍚炲悙閲忔彁鍗�2鍊嶏紝FP8閲忓寲鏀�鎸�70B妯″瀷鍗曞崱閮ㄧ讲",
+    "CrewAI v1.0鍜孉utoGPT v0.6鍚屾棩鍙戝竷锛屽�欰gent妗嗘灦绔炰簤鐧界儹鍖�",
+    "HuggingFace Transformers v5.0缁熶竴澶氭ā鎬丄PI鏋舵瀯"]'::jsonb,
   '[
-    {"title": "大模型开源动态", "items": [
-      {"title": "Meta开源Llama-4-R1推理增强模型", "summary": "Meta发布Llama-4-R1，基于强化学习的推理增强版本，在MATH和ARC测试中达到GPT-5同级水平，采用MIT许可证。", "score": 9.5, "url": "https://github.com/meta-llama/llama4", "source": "github", "tags": ["LLM", "开源", "推理"]},
-      {"title": "DeepSeek-V4技术报告解读", "summary": "DeepSeek发布V4技术报告，MoE架构370B参数，训练成本仅$5M。HN社区热议开源vs闭源。", "score": 9.3, "url": "https://news.ycombinator.com/item?id=40000001", "source": "hackernews", "tags": ["LLM", "开源", "MoE"]},
-      {"title": "OpenAI开源GPT-OSS 7B推理模型", "summary": "OpenAI意外开源GPT-OSS，7B参数，可在MacBook上运行，接近GPT-5-mini水平。社区反应两极化。", "score": 9.0, "url": "https://openai.com/blog/gpt-oss", "source": "rss", "tags": ["LLM", "开源", "推理"]}
+    {"title": "澶фā鍨嬪紑婧愬姩鎬�", "items": [
+      {"title": "Meta寮�婧怢lama-4-R1鎺ㄧ悊澧炲己妯″瀷", "summary": "Meta鍙戝竷Llama-4-R1锛屽熀浜庡己鍖栧�︿範鐨勬帹鐞嗗�炲己鐗堟湰锛屽湪MATH鍜孉RC娴嬭瘯涓�杈惧埌GPT-5鍚岀骇姘村钩锛岄噰鐢∕IT璁稿彲璇併��", "score": 9.5, "url": "https://github.com/meta-llama/llama4", "source": "github", "tags": ["LLM", "寮�婧�", "鎺ㄧ悊"]},
+      {"title": "DeepSeek-V4鎶�鏈�鎶ュ憡瑙ｈ��", "summary": "DeepSeek鍙戝竷V4鎶�鏈�鎶ュ憡锛孧oE鏋舵瀯370B鍙傛暟锛岃��缁冩垚鏈�浠�$5M銆侶N绀惧尯鐑�璁�寮�婧恦s闂�婧愩��", "score": 9.3, "url": "https://news.ycombinator.com/item?id=40000001", "source": "hackernews", "tags": ["LLM", "寮�婧�", "MoE"]},
+      {"title": "OpenAI寮�婧怗PT-OSS 7B鎺ㄧ悊妯″瀷", "summary": "OpenAI鎰忓�栧紑婧怗PT-OSS锛�7B鍙傛暟锛屽彲鍦∕acBook涓婅繍琛岋紝鎺ヨ繎GPT-5-mini姘村钩銆傜ぞ鍖哄弽搴斾袱鏋佸寲銆�", "score": 9.0, "url": "https://openai.com/blog/gpt-oss", "source": "rss", "tags": ["LLM", "寮�婧�", "鎺ㄧ悊"]}
     ]},
-    {"title": "Agent与智能体框架", "items": [
-      {"title": "Google Gemini 3.0首次支持Agent原生能力", "summary": "Gemini 3.0引入Agent API，支持多步工具调用、浏览器自动化和代码执行。MMLU-Pro达92%。", "score": 8.8, "url": "https://blog.google/technology/ai/gemini-3-agent/", "source": "rss", "tags": ["Agent", "Gemini", "多模态"]},
-      {"title": "CrewAI v1.0正式版发布", "summary": "CrewAI v1.0新增层级式Agent组织、条件任务流和Human-in-the-Loop审批节点。", "score": 8.0, "url": "https://github.com/crewAIInc/crewAI", "source": "github", "tags": ["Agent", "框架", "开源"]},
-      {"title": "AutoGPT发布自主Agent框架v0.6", "summary": "AutoGPT v0.6重构核心调度引擎，支持子Agent动态创建销毁，内存管理优化30%。", "score": 7.5, "url": "https://github.com/Significant-Gravitas/AutoGPT", "source": "github", "tags": ["Agent", "框架", "自主"]}
+    {"title": "Agent涓庢櫤鑳戒綋妗嗘灦", "items": [
+      {"title": "Google Gemini 3.0棣栨�℃敮鎸丄gent鍘熺敓鑳藉姏", "summary": "Gemini 3.0寮曞叆Agent API锛屾敮鎸佸�氭�ュ伐鍏疯皟鐢ㄣ�佹祻瑙堝櫒鑷�鍔ㄥ寲鍜屼唬鐮佹墽琛屻�侻MLU-Pro杈�92%銆�", "score": 8.8, "url": "https://blog.google/technology/ai/gemini-3-agent/", "source": "rss", "tags": ["Agent", "Gemini", "澶氭ā鎬�"]},
+      {"title": "CrewAI v1.0姝ｅ紡鐗堝彂甯�", "summary": "CrewAI v1.0鏂板�炲眰绾у紡Agent缁勭粐銆佹潯浠朵换鍔℃祦鍜孒uman-in-the-Loop瀹℃壒鑺傜偣銆�", "score": 8.0, "url": "https://github.com/crewAIInc/crewAI", "source": "github", "tags": ["Agent", "妗嗘灦", "寮�婧�"]},
+      {"title": "AutoGPT鍙戝竷鑷�涓籄gent妗嗘灦v0.6", "summary": "AutoGPT v0.6閲嶆瀯鏍稿績璋冨害寮曟搸锛屾敮鎸佸瓙Agent鍔ㄦ�佸垱寤洪攢姣侊紝鍐呭瓨绠＄悊浼樺寲30%銆�", "score": 7.5, "url": "https://github.com/Significant-Gravitas/AutoGPT", "source": "github", "tags": ["Agent", "妗嗘灦", "鑷�涓�"]}
     ]},
-    {"title": "AI工具链与基础设施", "items": [
-      {"title": "vLLM v0.7推理吞吐量提升2倍", "summary": "vLLM v0.7引入PagedAttention V3和FP8量化，单卡A100可跑70B模型。", "score": 8.5, "url": "https://github.com/vllm-project/vllm/releases/tag/v0.7.0", "source": "github", "tags": ["推理", "基础设施", "开源"]},
-      {"title": "MCP Python SDK正式发布", "summary": "Anthropic开源MCP的Python SDK，标准化AI模型上下文管理接口。", "score": 7.8, "url": "https://github.com/modelcontextprotocol/python-sdk", "source": "github", "tags": ["MCP", "SDK", "标准化"]}
+    {"title": "AI宸ュ叿閾句笌鍩虹��璁炬柦", "items": [
+      {"title": "vLLM v0.7鎺ㄧ悊鍚炲悙閲忔彁鍗�2鍊�", "summary": "vLLM v0.7寮曞叆PagedAttention V3鍜孎P8閲忓寲锛屽崟鍗�A100鍙�璺�70B妯″瀷銆�", "score": 8.5, "url": "https://github.com/vllm-project/vllm/releases/tag/v0.7.0", "source": "github", "tags": ["鎺ㄧ悊", "鍩虹��璁炬柦", "寮�婧�"]},
+      {"title": "MCP Python SDK姝ｅ紡鍙戝竷", "summary": "Anthropic寮�婧怣CP鐨凱ython SDK锛屾爣鍑嗗寲AI妯″瀷涓婁笅鏂囩�＄悊鎺ュ彛銆�", "score": 7.8, "url": "https://github.com/modelcontextprotocol/python-sdk", "source": "github", "tags": ["MCP", "SDK", "鏍囧噯鍖�"]}
     ]},
-    {"title": "AI政策与行业动态", "items": [
-      {"title": "欧盟AI法案第二阶段生效", "summary": "覆盖Agent系统、自动驾驶和医疗AI。要求透明性报告和人工监督。违规罚全球营收7%。", "score": 8.2, "url": "https://techcrunch.com/2026/05/24/eu-ai-act-phase-2", "source": "rss", "tags": ["政策", "监管", "欧盟"]},
-      {"title": "YC 2026夏季AI初创占比82%", "summary": "230家初创公司中AI相关占82%，集中在Agent工具、垂直应用和基础设施。", "score": 7.0, "url": "https://news.ycombinator.com/item?id=40000008", "source": "hackernews", "tags": ["融资", "创业", "YC"]}
+    {"title": "AI鏀跨瓥涓庤�屼笟鍔ㄦ��", "items": [
+      {"title": "娆х洘AI娉曟�堢��浜岄樁娈电敓鏁�", "summary": "瑕嗙洊Agent绯荤粺銆佽嚜鍔ㄩ┚椹跺拰鍖荤枟AI銆傝�佹眰閫忔槑鎬ф姤鍛婂拰浜哄伐鐩戠潱銆傝繚瑙勭綒鍏ㄧ悆钀ユ敹7%銆�", "score": 8.2, "url": "https://techcrunch.com/2026/05/24/eu-ai-act-phase-2", "source": "rss", "tags": ["鏀跨瓥", "鐩戠��", "娆х洘"]},
+      {"title": "YC 2026澶忓��AI鍒濆垱鍗犳瘮82%", "summary": "230瀹跺垵鍒涘叕鍙镐腑AI鐩稿叧鍗�82%锛岄泦涓�鍦ˋgent宸ュ叿銆佸瀭鐩村簲鐢ㄥ拰鍩虹��璁炬柦銆�", "score": 7.0, "url": "https://news.ycombinator.com/item?id=40000008", "source": "hackernews", "tags": ["铻嶈祫", "鍒涗笟", "YC"]}
     ]}
   ]'::jsonb,
-  '["开源模型与闭源差距缩小至0.3%，Llama-4-R1和DeepSeek-V4成为里程碑",
-    "Agent原生能力成为大模型标配，Gemini 3.0和Claude Opus 4.7引领趋势",
-    "AI工具链基础设施加速成熟，vLLM/ChromaDB/RAGFlow密集发布大版本",
-    "欧盟AI监管正式落地，合规成本将成为AI企业重要考量"]'::jsonb,
+  '["寮�婧愭ā鍨嬩笌闂�婧愬樊璺濈缉灏忚嚦0.3%锛孡lama-4-R1鍜孌eepSeek-V4鎴愪负閲岀▼纰�",
+    "Agent鍘熺敓鑳藉姏鎴愪负澶фā鍨嬫爣閰嶏紝Gemini 3.0鍜孋laude Opus 4.7寮曢�嗚秼鍔�",
+    "AI宸ュ叿閾惧熀纭�璁炬柦鍔犻�熸垚鐔燂紝vLLM/ChromaDB/RAGFlow瀵嗛泦鍙戝竷澶х増鏈�",
+    "娆х洘AI鐩戠�℃�ｅ紡钀藉湴锛屽悎瑙勬垚鏈�灏嗘垚涓篈I浼佷笟閲嶈�佽�冮噺"]'::jsonb,
   '{"fetched": 30, "scored": 30, "passed": 14, "dedup_removed": 2}'::jsonb
 ),
 ('b0000001-0000-0000-0000-000000000002', 'morning', '2026-05-23', 'zh',
-  '["Anthropic Claude Opus 4.6发布，Agent能力显著提升",
-    "LangChain发布多Agent协作框架",
-    "ChromaDB向量数据库达到十亿级规模",
-    "HuggingFace发布Transformers v5.0预览版",
-    "中国信通院发布Agent产业白皮书"]'::jsonb,
-  '[{"title": "大模型动态", "items": [{"title": "Claude Opus 4.6发布", "summary": "Anthropic发布Claude Opus 4.6，Agent能力进一步提升。", "score": 9.0, "url": "https://example.com/claude-4-6", "source": "rss", "tags": ["LLM", "Anthropic"]}]}]'::jsonb,
-  '["Agent能力成为大模型核心竞争力"]'::jsonb,
+  '["Anthropic Claude Opus 4.6鍙戝竷锛孉gent鑳藉姏鏄捐憲鎻愬崌",
+    "LangChain鍙戝竷澶欰gent鍗忎綔妗嗘灦",
+    "ChromaDB鍚戦噺鏁版嵁搴撹揪鍒板崄浜跨骇瑙勬ā",
+    "HuggingFace鍙戝竷Transformers v5.0棰勮�堢増",
+    "涓�鍥戒俊閫氶櫌鍙戝竷Agent浜т笟鐧界毊涔�"]'::jsonb,
+  '[{"title": "澶фā鍨嬪姩鎬�", "items": [{"title": "Claude Opus 4.6鍙戝竷", "summary": "Anthropic鍙戝竷Claude Opus 4.6锛孉gent鑳藉姏杩涗竴姝ユ彁鍗囥��", "score": 9.0, "url": "https://example.com/claude-4-6", "source": "rss", "tags": ["LLM", "Anthropic"]}]}]'::jsonb,
+  '["Agent鑳藉姏鎴愪负澶фā鍨嬫牳蹇冪珵浜夊姏"]'::jsonb,
   '{"fetched": 28, "scored": 28, "passed": 12}'::jsonb
 ),
 ('b0000001-0000-0000-0000-000000000003', 'evening', '2026-05-23', 'zh',
-  '["Dify v1.5多Agent工作流上线",
-    "PromptFlow开源引发LLM工具链讨论",
-    "斯坦福AI指数2026发布，中国论文数量领先",
-    "Next.js 16内置RAG API",
-    "Langfuse v3.0实时成本追踪"]'::jsonb,
-  '[{"title": "AI工具链", "items": [{"title": "Dify v1.5发布", "summary": "新增多Agent工作流和RAG管道可视化编排。", "score": 8.5, "url": "https://github.com/langgenius/dify", "source": "github", "tags": ["工具", "RAG", "开源"]}]}]'::jsonb,
-  '["AI开发工具链日趋成熟，低代码Agent构建成为趋势"]'::jsonb,
+  '["Dify v1.5澶欰gent宸ヤ綔娴佷笂绾�",
+    "PromptFlow寮�婧愬紩鍙慙LM宸ュ叿閾捐�ㄨ��",
+    "鏂�鍧︾�廇I鎸囨暟2026鍙戝竷锛屼腑鍥借�烘枃鏁伴噺棰嗗厛",
+    "Next.js 16鍐呯疆RAG API",
+    "Langfuse v3.0瀹炴椂鎴愭湰杩借釜"]'::jsonb,
+  '[{"title": "AI宸ュ叿閾�", "items": [{"title": "Dify v1.5鍙戝竷", "summary": "鏂板�炲�欰gent宸ヤ綔娴佸拰RAG绠￠亾鍙�瑙嗗寲缂栨帓銆�", "score": 8.5, "url": "https://github.com/langgenius/dify", "source": "github", "tags": ["宸ュ叿", "RAG", "寮�婧�"]}]}]'::jsonb,
+  '["AI寮�鍙戝伐鍏烽摼鏃ヨ秼鎴愮啛锛屼綆浠ｇ爜Agent鏋勫缓鎴愪负瓒嬪娍"]'::jsonb,
   '{"fetched": 25, "scored": 25, "passed": 10}'::jsonb
 );
 
--- ── subscriptions: 5 个假用户（供 C 开发用）───────────────────────
+-- 鈹�鈹� subscriptions: 5 涓�鍋囩敤鎴凤紙渚� C 寮�鍙戠敤锛夆攢鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�
 INSERT INTO subscriptions (id, openid, subscribed, morning_enabled, evening_enabled) VALUES
 ('c0000001-0000-0000-0000-000000000001', 'mock_openid_user_001', true, true, true),
 ('c0000001-0000-0000-0000-000000000002', 'mock_openid_user_002', true, true, false),
@@ -104,7 +104,7 @@ INSERT INTO subscriptions (id, openid, subscribed, morning_enabled, evening_enab
 ('c0000001-0000-0000-0000-000000000004', 'mock_openid_user_004', false, true, true),
 ('c0000001-0000-0000-0000-000000000005', 'mock_openid_user_005', true, true, true);
 
--- ── publish_log: 若干假发布记录（供 D/E 开发用）───────────────────
+-- 鈹�鈹� publish_log: 鑻ュ共鍋囧彂甯冭�板綍锛堜緵 D/E 寮�鍙戠敤锛夆攢鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�
 INSERT INTO publish_log (id, briefing_id, platform, status, platform_url, published_at) VALUES
 ('d0000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000002', 'weixin_oa', 'success', 'https://mp.weixin.qq.com/s/mock-article-001', '2026-05-23 08:30:00+00'),
 ('d0000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 'zhihu', 'success', 'https://zhuanlan.zhihu.com/p/mock-001', '2026-05-23 08:35:00+00'),
@@ -112,7 +112,7 @@ INSERT INTO publish_log (id, briefing_id, platform, status, platform_url, publis
 ('d0000001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000003', 'weixin_oa', 'success', 'https://mp.weixin.qq.com/s/mock-article-002', '2026-05-23 20:30:00+00'),
 ('d0000001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000003', 'zhihu', 'pending', NULL, '2026-05-23 20:35:00+00');
 
--- ── run_log: 若干假运行记录（供 E 开发用）─────────────────────────
+-- 鈹�鈹� run_log: 鑻ュ共鍋囪繍琛岃�板綍锛堜緵 E 寮�鍙戠敤锛夆攢鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�鈹�
 INSERT INTO run_log (id, module, run_type, status, started_at, finished_at, detail) VALUES
 ('e0000001-0000-0000-0000-000000000001', 'A', 'morning', 'success', '2026-05-23 08:00:00+00', '2026-05-23 08:01:30+00', '{"fetched": 45, "sources": {"github": 15, "hackernews": 10, "rss": 20}}'),
 ('e0000001-0000-0000-0000-000000000002', 'B', 'morning', 'success', '2026-05-23 08:01:30+00', '2026-05-23 08:04:00+00', '{"scored": 45, "passed": 12}'),

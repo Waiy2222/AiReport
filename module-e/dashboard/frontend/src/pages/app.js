@@ -1,0 +1,365 @@
+/* ================================================================
+   AI资讯早报/晚报 Dashboard — app.js
+   ================================================================ */
+
+// ---------- Config ----------
+const API_BASE = (window.DASHBOARD_API_BASE || "http://localhost:8005").replace(/\/+$/, "");
+const REFRESH_INTERVAL = 30000;  // 30 seconds
+
+// ---------- State ----------
+let refreshTimer = null;
+let logPage = { offset: 0, limit: 20, total: 0 };
+let scheduleData = null;
+
+// ---------- Init ----------
+document.addEventListener("DOMContentLoaded", () => {
+  startClock();
+  loadAll();
+  refreshTimer = setInterval(loadAll, REFRESH_INTERVAL);
+});
+
+// ---------- API helpers ----------
+async function apiGet(path, params = {}) {
+  const url = new URL(`${API_BASE}${path}`);
+  Object.entries(params).forEach(([k, v]) => { if (v !== "" && v != null) url.searchParams.set(k, v); });
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+async function apiPost(path, body = null) {
+  const opts = { method: "POST", headers: { "Content-Type": "application/json" } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${API_BASE}${path}`, opts);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+// ---------- Load all data ----------
+async function loadAll() {
+  try {
+    const [overview, schedule, stats, healthAll] = await Promise.allSettled([
+      apiGet("/admin/overview"),
+      apiGet("/admin/schedule"),
+      apiGet("/api/dashboard/stats"),
+      apiGet("/api/dashboard/health/all"),
+    ]);
+    const ov   = overview.status   === "fulfilled" ? overview.value   : null;
+    const sch  = schedule.status   === "fulfilled" ? schedule.value   : null;
+    const st   = stats.status      === "fulfilled" ? stats.value      : null;
+    const hAll = healthAll.status  === "fulfilled" ? healthAll.value  : null;
+
+    if (ov)  renderOverview(ov);
+    if (sch) { scheduleData = sch; renderSchedule(sch); }
+    if (st)  renderStats(st);
+    if (hAll) renderModuleHealth(hAll, ov?.modules);
+    if (!ov && !sch && !st && !hAll) showToast("error", "无法连接后端，请确认服务运行在 " + API_BASE);
+  } catch (e) {
+    console.error("loadAll error:", e);
+  }
+  loadLogs();
+}
+
+// ---------- Clock ----------
+function startClock() {
+  const tick = () => {
+    const now = new Date();
+    document.getElementById("clock").textContent =
+      now.toLocaleString("zh-CN", { hour12: false });
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ---------- Render Module Health ----------
+function renderModuleHealth(healthAll, overviewModules) {
+  const container = document.getElementById("moduleCards");
+  const map = { A: "资讯抓取", B: "AI加工", C: "推送", D: "发布", E: "调度" };
+
+  const overviewStatus = overviewModules || {};
+  const healthModules = healthAll?.modules || {};
+
+  let html = "";
+  for (const m of ["A", "B", "C", "D", "E"]) {
+    const runStatus = overviewStatus[m] || healthModules[m]?.status || "unknown";
+    const lastRun = healthModules[m]?.last_run || null;
+    const cls = statusClass(runStatus);
+    html += `
+      <div class="module-card ${cls}">
+        <div class="mod-label">${m}</div>
+        <div class="mod-status">${statusLabel(runStatus)}</div>
+        <div class="mod-time">${lastRun ? formatTime(lastRun) : "—"}</div>
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+// ---------- Render Overview (briefings) ----------
+function renderOverview(ov) {
+  const container = document.getElementById("briefingCards");
+  let html = "";
+  ["morning", "evening"].forEach((type) => {
+    const d = ov[type] || {};
+    const status = d.status || "pending";
+    const bid = d.briefing_id || "—";
+    const genAt = d.generated_at || null;
+    const rawStats = d.raw_stats || null;
+    let tlDr = "暂无内容";
+    if (rawStats) {
+      try {
+        const parsed = typeof rawStats === "string" ? JSON.parse(rawStats) : rawStats;
+        tlDr = parsed.tl_dr || parsed.tldr || parsed.summary || JSON.stringify(parsed, null, 2);
+      } catch (e) { tlDr = String(rawStats); }
+    }
+    const label = type === "morning" ? "早报" : "晚报";
+    html += `
+      <div class="briefing-card" onclick="toggleBriefing(this)" data-tldr="${escapeHtml(String(tlDr))}">
+        <div class="bf-header">
+          <span class="bf-type">${label}</span>
+          <span class="badge badge-${status}">${statusLabel(status)}</span>
+        </div>
+        <div class="bf-id">ID: ${bid}</div>
+        <div class="bf-time">${genAt ? formatTime(genAt) : "—"}</div>
+        <div class="bf-tldr">${escapeHtml(String(tlDr))}</div>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function toggleBriefing(el) {
+  const expanded = el.classList.contains("expanded");
+  document.querySelectorAll(".briefing-card").forEach((c) => c.classList.remove("expanded"));
+  if (!expanded) el.classList.add("expanded");
+}
+
+// ---------- Trigger Pipeline ----------
+async function triggerPipeline(type) {
+  const btnId = type === "morning" ? "triggerMorning" : "triggerEvening";
+  const btn = document.getElementById(btnId);
+  const fb = document.getElementById("triggerFeedback");
+  const originalText = btn.textContent;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 执行中...';
+  fb.innerHTML = "";
+  fb.className = "trigger-feedback";
+
+  try {
+    const result = await apiPost(`/admin/trigger?type=${type}`);
+    fb.innerHTML = `触发成功: batch_id=${result.batch_id}, status=${result.status}`;
+    fb.className = "trigger-feedback success";
+    showToast("success", `${type === "morning" ? "早报" : "晚报"}流水线触发成功`);
+    // Reload data after a short delay
+    setTimeout(loadAll, 3000);
+  } catch (e) {
+    fb.innerHTML = `触发失败: ${e.message}`;
+    fb.className = "trigger-feedback error";
+    showToast("error", `触发失败: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// ---------- Render Stats ----------
+function renderStats(st) {
+  const container = document.getElementById("statsGrid");
+  const ov = st.overall || {};
+  const bft = st.briefings_by_type || {};
+  let html = `
+    <div class="stat-card stat-total">
+      <div class="stat-value">${ov.total_runs ?? 0}</div>
+      <div class="stat-label">总运行次数</div>
+    </div>
+    <div class="stat-card stat-success">
+      <div class="stat-value">${ov.total_success ?? 0}</div>
+      <div class="stat-label">成功</div>
+    </div>
+    <div class="stat-card stat-failed">
+      <div class="stat-value">${ov.total_failed ?? 0}</div>
+      <div class="stat-label">失败</div>
+    </div>
+    <div class="stat-card stat-rate">
+      <div class="stat-value">${ov.success_rate ?? 0}%</div>
+      <div class="stat-label">成功率</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${st.total_briefings ?? 0}</div>
+      <div class="stat-label">简报总数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${bft.morning || 0}/${bft.evening || 0}</div>
+      <div class="stat-label">早报/晚报</div>
+    </div>`;
+  container.innerHTML = html;
+}
+
+// ---------- Render Schedule ----------
+function renderSchedule(sch) {
+  const container = document.getElementById("scheduleContent");
+  const running = sch.scheduler_running;
+  let html = "";
+  ["morning", "evening"].forEach((type) => {
+    const job = (sch.jobs || []).find((j) => j.id.includes(type));
+    const nextRun = job?.next_run || null;
+    const timeStr = type === "morning" ? sch.morning_time : sch.evening_time;
+    html += `
+      <div class="schedule-card">
+        <div class="sched-label">${type === "morning" ? "早报" : "晚报"}定时</div>
+        <div class="sched-time">${timeStr}</div>
+        <div class="sched-countdown" id="countdown-${type}">${nextRun ? countdown(nextRun) : "—"}</div>
+      </div>`;
+  });
+  html += `
+    <div style="grid-column:1/-1">
+      <span class="schedule-status ${running ? 'active' : 'stopped'}">
+        ${running ? '调度运行中' : '调度已停止'}
+      </span>
+      <span style="font-size:0.75rem;color:var(--text-secondary);margin-left:8px;">
+        时区: ${sch.timezone || "Asia/Shanghai"}
+      </span>
+    </div>`;
+  container.innerHTML = html;
+}
+
+function countdown(isoStr) {
+  const target = new Date(isoStr);
+  const now = new Date();
+  const diff = target - now;
+  if (diff < 0) return "已过期";
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  return `下次运行: ${h}时${m}分${s}秒后`;
+}
+
+// ---------- Run Logs ----------
+async function loadLogs(offset = 0) {
+  const module = document.getElementById("logFilterModule")?.value || "";
+  const status = document.getElementById("logFilterStatus")?.value || "";
+  logPage.offset = offset;
+
+  try {
+    const data = await apiGet("/api/dashboard/logs", {
+      module, status, limit: logPage.limit, offset,
+    });
+    logPage.total = data.total;
+    renderRunsTable(data.logs);
+    renderLogPagination();
+  } catch (e) {
+    console.error("loadLogs error:", e);
+    document.getElementById("runsTbody").innerHTML =
+      `<tr><td colspan="6" class="loading-placeholder">加载失败: ${e.message}</td></tr>`;
+  }
+}
+
+function renderRunsTable(logs) {
+  const tbody = document.getElementById("runsTbody");
+  if (!logs || logs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-placeholder">暂无运行记录</td></tr>';
+    return;
+  }
+  let html = "";
+  logs.forEach((l) => {
+    html += `
+      <tr>
+        <td><strong>${l.module}</strong></td>
+        <td>${l.run_type === "morning" ? "早报" : l.run_type === "evening" ? "晚报" : l.run_type}</td>
+        <td><span class="badge badge-${statusBadge(l.status)}">${statusLabel(l.status)}</span></td>
+        <td>${l.started_at ? formatTime(l.started_at) : "—"}</td>
+        <td>${l.finished_at ? formatTime(l.finished_at) : "—"}</td>
+        <td>${l.status === "failed"
+          ? `<button class="btn btn-retry" onclick="retryRun('${l.id}')">重试</button>`
+          : "—"}</td>
+      </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function renderLogPagination() {
+  const container = document.getElementById("logPagination");
+  const totalPages = Math.ceil(logPage.total / logPage.limit);
+  const currentPage = Math.floor(logPage.offset / logPage.limit) + 1;
+  container.innerHTML = `
+    <button ${logPage.offset === 0 ? "disabled" : ""}
+            onclick="loadLogs(${Math.max(0, logPage.offset - logPage.limit)})">上一页</button>
+    <span>第 ${currentPage} / ${Math.max(1, totalPages)} 页 (共 ${logPage.total} 条)</span>
+    <button ${logPage.offset + logPage.limit >= logPage.total ? "disabled" : ""}
+            onclick="loadLogs(${logPage.offset + logPage.limit})">下一页</button>`;
+}
+
+// ---------- Retry ----------
+async function retryRun(runId) {
+  if (!confirm(`确定要重试运行 ${runId} 吗？`)) return;
+  try {
+    const result = await apiPost(`/api/dashboard/retry/${runId}`);
+    showToast("success", `重试已触发 (${result.run_type})`);
+    setTimeout(loadAll, 3000);
+    loadLogs(logPage.offset);
+  } catch (e) {
+    showToast("error", `重试失败: ${e.message}`);
+  }
+}
+
+// ---------- Modal ----------
+function openModal(title, body) {
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("modalBody").innerHTML = body;
+  document.getElementById("modalOverlay").classList.add("active");
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").classList.remove("active");
+}
+
+// ---------- Toast ----------
+function showToast(type, message) {
+  const container = document.getElementById("toastContainer");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transition = "opacity 0.3s";
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+// ---------- Helpers ----------
+function statusClass(s) {
+  if (s === "success") return "status-ok";
+  if (s === "failed" || s === "error") return "status-fail";
+  if (s === "running") return "status-running";
+  return "status-unknown";
+}
+
+function statusLabel(s) {
+  const map = { success: "成功", failed: "失败", running: "运行中", pending: "待处理", done: "已完成", unknown: "未知" };
+  return map[s] || s;
+}
+
+function statusBadge(s) {
+  const map = { success: "done", failed: "failed", running: "pending", done: "done", pending: "pending" };
+  return map[s] || "pending";
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return "—";
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString("zh-CN", { hour12: false });
+  } catch (e) { return isoStr; }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}

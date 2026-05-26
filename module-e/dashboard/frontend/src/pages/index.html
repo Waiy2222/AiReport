@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI资讯早报/晚报 — 调度管理 Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ========== Header ========== -->
+  <header class="header">
+    <div class="header-left">
+      <h1>AI资讯早报/晚报 — 调度管理 Dashboard</h1>
+      <span class="header-subtitle">Module E · Port 8005</span>
+    </div>
+    <div class="header-right">
+      <span class="clock" id="clock">--</span>
+      <span class="refresh-badge" id="refreshBadge">自动刷新 30s</span>
+    </div>
+  </header>
+
+  <main class="main-grid">
+
+    <!-- ========== Module Status Cards ========== -->
+    <section class="section modules-section">
+      <h2 class="section-title">模块状态</h2>
+      <div class="module-cards" id="moduleCards">
+        <!-- A-E cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- ========== Today Briefings ========== -->
+    <section class="section briefings-section">
+      <h2 class="section-title">今日简报</h2>
+      <div class="cards-row" id="briefingCards">
+        <!-- morning / evening cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- ========== Pipeline Trigger ========== -->
+    <section class="section trigger-section">
+      <h2 class="section-title">手动触发流水线</h2>
+      <div class="trigger-row">
+        <button class="btn btn-trigger btn-morning" id="triggerMorning" onclick="triggerPipeline('morning')">
+          触发早报
+        </button>
+        <button class="btn btn-trigger btn-evening" id="triggerEvening" onclick="triggerPipeline('evening')">
+          触发晚报
+        </button>
+      </div>
+      <div class="trigger-feedback" id="triggerFeedback"></div>
+    </section>
+
+    <!-- ========== Stats Overview ========== -->
+    <section class="section stats-section">
+      <h2 class="section-title">运行统计</h2>
+      <div class="stats-grid" id="statsGrid">
+        <!-- injected by JS -->
+      </div>
+    </section>
+
+    <!-- ========== Schedule Info ========== -->
+    <section class="section schedule-section">
+      <h2 class="section-title">定时任务</h2>
+      <div class="schedule-content" id="scheduleContent">
+        <!-- injected by JS -->
+      </div>
+    </section>
+
+    <!-- ========== Recent Runs Table ========== -->
+    <section class="section runs-section">
+      <h2 class="section-title">
+        最近运行记录
+        <span class="section-controls">
+          <label>模块筛选
+            <select id="logFilterModule" onchange="loadLogs()">
+              <option value="">全部</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+              <option value="E">E</option>
+            </select>
+          </label>
+          <label>状态
+            <select id="logFilterStatus" onchange="loadLogs()">
+              <option value="">全部</option>
+              <option value="success">success</option>
+              <option value="failed">failed</option>
+              <option value="running">running</option>
+            </select>
+          </label>
+        </span>
+      </h2>
+      <div class="table-wrapper">
+        <table class="runs-table" id="runsTable">
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>类型</th>
+              <th>状态</th>
+              <th>开始时间</th>
+              <th>结束时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="runsTbody">
+            <!-- injected by JS -->
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="logPagination"></div>
+    </section>
+
+  </main>
+
+  <!-- ========== Toast Container ========== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ========== Briefing Detail Modal ========== -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modalTitle">简报详情</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,8 +1,9 @@
 version: "3.8"
 
 services:
+  # Phase 2: pgvector 替代原生 postgres
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ai_news}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -13,6 +14,8 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./contracts/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./contracts/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql
+      - ./contracts/schema_v2.sql:/docker-entrypoint-initdb.d/03-schema_v2.sql
+      - ./contracts/seed_data_v2.sql:/docker-entrypoint-initdb.d/04-seed_data_v2.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -25,6 +28,10 @@ services:
       - "8001:8001"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.deepseek.com/v1}
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,6 +44,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,6 +57,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
       WECHAT_APPID: ${WECHAT_APPID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
+      WEIXIN_OA_APPID: ${WEIXIN_OA_APPID:-}
+      WEIXIN_OA_SECRET: ${WEIXIN_OA_SECRET:-}
+      WEIXIN_OA_TOKEN: ${WEIXIN_OA_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,7 +72,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
       ZHIHU_CLIENT_ID: ${ZHIHU_CLIENT_ID:-}
       ZHIHU_CLIENT_SECRET: ${ZHIHU_CLIENT_SECRET:-}
-      CSDN_ACCESS_TOKEN: ${CSDN_ACCESS_TOKEN:-}
+      CSDN_USERNAME: ${CSDN_USERNAME:-}
+      CSDN_PASSWORD: ${CSDN_PASSWORD:-}
       WEIXIN_OA_APPID: ${WEIXIN_OA_APPID:-}
       WEIXIN_OA_SECRET: ${WEIXIN_OA_SECRET:-}
     depends_on:
@@ -78,6 +90,26 @@ services:
       B_URL: http://module-b:8002/run-b
       C_URL: http://module-c:8003/push
       D_URL: http://module-d:8004/publish
+      F_URL: http://module-f:8006/generate
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  module-f:
+    build: ./module-f
+    ports:
+      - "8006:8006"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      VIDEO_OUTPUT_DIR: /app/output
+      VIDEO_DOWNLOAD_DIR: /app/downloads
+    volumes:
+      - video_output:/app/output
+      - video_downloads:/app/downloads
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,6 +126,9 @@ services:
       - module-c
       - module-d
       - module-e
+      - module-f
 
 volumes:
   pgdata:
+  video_output:
+  video_downloads:

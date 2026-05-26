@@ -1,28 +1,23 @@
 """Module E — 调度管理与 Dashboard (:8005)"""
 import os
-import uuid
 import json
-import asyncio
 import logging
-from datetime import datetime, date, time, timezone
+from datetime import date
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from db import get_pool, init_db, close_db
+from pipeline import execute_pipeline
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [E] %(message)s")
 logger = logging.getLogger(__name__)
 
 # ---------- 配置 ----------
-A_URL = os.getenv("A_URL", "http://module-a:8001/run")
-B_URL = os.getenv("B_URL", "http://module-b:8002/run-b")
-C_URL = os.getenv("C_URL", "http://module-c:8003/push")
-D_URL = os.getenv("D_URL", "http://module-d:8004/publish")
-
 SCHEDULE_ENABLED = os.getenv("SCHEDULE_ENABLED", "true").lower() == "true"
 MORNING_TIME = os.getenv("MORNING_TIME", "08:00")  # 早报 8:00
 EVENING_TIME = os.getenv("EVENING_TIME", "20:00")   # 晚报 20:00
@@ -35,102 +30,10 @@ async def scheduled_trigger(type_: str):
     """定时任务入口：被 APScheduler 调用"""
     logger.info(f"Scheduled trigger: {type_}")
     try:
-        result = await _execute_pipeline(type_)
+        result = await execute_pipeline(type_)
         logger.info(f"Scheduled {type_} done: {json.dumps(result, default=str)[:200]}")
     except Exception as e:
         logger.error(f"Scheduled {type_} failed: {e}")
-
-
-async def _execute_pipeline(type_: str) -> dict:
-    """执行完整流水线 A → B → C+D，写 run_log"""
-    import httpx
-
-    batch_id = str(uuid.uuid4())
-    today = date.today().isoformat()
-    pool = get_pool()
-
-    steps = {}
-
-    async def log_step(module: str, status: str, detail: dict | None = None):
-        step_id = str(uuid.uuid4())
-        await pool.execute(
-            """INSERT INTO run_log (id, module, run_type, status, started_at, finished_at, detail)
-               VALUES ($1, $2, $3, $4, now(),
-                       CASE WHEN $4 != 'running' THEN now() ELSE NULL END,
-                       COALESCE($5::jsonb, '{}'))""",
-            uuid.UUID(step_id), module, type_, status,
-            json.dumps(detail) if detail else None,
-        )
-        return step_id
-
-    # Step 1: A — 资讯抓取
-    await log_step("A", "running")
-    async with httpx.AsyncClient(timeout=180) as client:
-        hours = 12  # morning 和 evening 都往前抓12小时
-        try:
-            r = await client.post(A_URL, json={"batch_id": batch_id, "hours_back": hours})
-            r.raise_for_status()
-            steps["fetch"] = r.json()
-            await log_step("A", "success", steps["fetch"])
-        except Exception as e:
-            steps["fetch"] = {"status": "failed", "error": str(e)}
-            await log_step("A", "failed", steps["fetch"])
-            return {"status": "failed", "batch_id": batch_id, "type": type_, "steps": steps}
-
-        # Step 2: B — AI 内容加工
-        await log_step("B", "running")
-        briefing_id = None
-        try:
-            r = await client.post(B_URL, json={"type": type_, "date": today, "batch_id": batch_id})
-            r.raise_for_status()
-            steps["process"] = r.json()
-            briefing_id = steps["process"].get("briefing_id")
-            await log_step("B", "success", steps["process"])
-        except Exception as e:
-            steps["process"] = {"status": "failed", "error": str(e)}
-            await log_step("B", "failed", steps["process"])
-            return {"status": "failed", "batch_id": batch_id, "type": type_, "steps": steps}
-
-        # Step 3: C + D 并行
-        if not briefing_id:
-            return {"status": "failed", "batch_id": batch_id, "type": type_, "steps": steps, "error": "no briefing_id from B"}
-
-        await log_step("C", "running")
-        await log_step("D", "running")
-
-        c_result, d_result = await asyncio.gather(
-            _do_push(client, type_),
-            _do_publish(client, briefing_id),
-            return_exceptions=True,
-        )
-
-        for module, result in [("C", c_result), ("D", d_result)]:
-            if isinstance(result, Exception):
-                steps["push" if module == "C" else "publish"] = {"status": "failed", "error": str(result)}
-                await log_step(module, "failed", {"error": str(result)})
-            else:
-                steps["push" if module == "C" else "publish"] = result
-                await log_step(module, "success", result)
-
-    return {
-        "status": "ok",
-        "batch_id": batch_id,
-        "type": type_,
-        "briefing_id": briefing_id,
-        "steps": steps,
-    }
-
-
-async def _do_push(client, type_: str) -> dict:
-    r = await client.post(C_URL, json={"type": type_})
-    r.raise_for_status()
-    return r.json()
-
-
-async def _do_publish(client, briefing_id: str) -> dict:
-    r = await client.post(D_URL, json={"briefing_id": briefing_id})
-    r.raise_for_status()
-    return r.json()
 
 
 # ---------- FastAPI ----------
@@ -172,6 +75,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Module E - Scheduler & Dashboard", lifespan=lifespan)
 
+# ---------- CORS (allow dashboard from any origin) ----------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # ---------- 健康检查 ----------
 @app.get("/health")
@@ -206,7 +118,7 @@ async def trigger(type: str = Query(..., description="morning or evening")):
         raise HTTPException(503, "database not available")
 
     try:
-        result = await _execute_pipeline(type)
+        result = await execute_pipeline(type)
         return result
     except Exception as e:
         raise HTTPException(500, f"pipeline failed: {e}")
@@ -300,3 +212,13 @@ async def schedule_status():
         "timezone": "Asia/Shanghai",
         "jobs": jobs,
     }
+
+
+# ---------- Dashboard Router ----------
+from dashboard.backend.dashboard import router as dashboard_router
+app.include_router(dashboard_router)
+
+# ---------- Static file serving for dashboard frontend ----------
+_frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard", "frontend", "src", "pages")
+if os.path.isdir(_frontend_dir):
+    app.mount("/dashboard", StaticFiles(directory=_frontend_dir, html=True), name="dashboard_static")

@@ -1,10 +1,10 @@
 openapi: "3.0.0"
 info:
   title: AI 资讯早报/晚报智能体 - 模块接口规范
-  version: "1.0.0"
+  version: "2.0.0"
   description: |
-    5 个模块的唯一入口接口。所有模块必须实现 GET /health。
-    所有接口输入输出均为 JSON。时间字段统一 ISO 8601 UTC。
+    Phase 2 更新：增加个性化推送、RAG检索、长图生成、视频生成接口。
+    5 个模块 → 6 个模块（新增 F: 视频生成）。
 
 # ============================================================
 # 模块 A — 资讯抓取 (:8001)
@@ -31,7 +31,8 @@ paths:
     post:
       summary: "[A] 触发资讯抓取"
       description: |
-        A 模块唯一业务入口。接收参数后从外部数据源抓取AI资讯，写入 raw_items 表。
+        抓取 + LLM 相关性筛选 + embedding 生成。
+        筛选结果写入 raw_items 表（含 embedding 列）。
       requestBody:
         required: true
         content:
@@ -62,32 +63,32 @@ paths:
                     enum: [ok, partial]
                   fetched:
                     type: integer
+                  llm_filtered:
+                    type: boolean
                   batch_id:
                     type: string
                   per_source:
                     type: object
                 example:
                   status: ok
-                  fetched: 86
+                  fetched: 25
+                  llm_filtered: true
                   batch_id: "550e8400-e29b-41d4-a716-446655440000"
                   per_source:
-                    github: 25
-                    hackernews: 20
-                    rss: 35
-                    reddit: 6
+                    github: 10
+                    hackernews: 8
+                    rss: 5
+                    reddit: 2
 
   # ============================================================
   # 模块 B — AI 内容加工 (:8002)
   # ============================================================
-  # 注：模块 B 也暴露 /run，但参数不同。
-  # 在 nginx 中按端口路由，不会冲突。
-
   /run-b:
     post:
       summary: "[B] 触发 AI 内容加工"
       description: |
-        B 模块唯一业务入口。读取 raw_items 中指定批次的数据，调用 DeepSeek 进行评分、
-        去重、摘要、背景补充，生成结构化简报写入 briefings 表。
+        评分 → 去重 → 背景补充 → 配图匹配 → 结构化生成。
+        输出配图简报写入 briefings 表。
       requestBody:
         required: true
         content:
@@ -107,7 +108,7 @@ paths:
                   format: uuid
               example:
                 type: morning
-                date: "2026-05-24"
+                date: "2026-05-27"
                 batch_id: "550e8400-e29b-41d4-a716-446655440000"
       responses:
         "200":
@@ -128,21 +129,41 @@ paths:
                   status: ok
                   briefing_id: "660e8400-e29b-41d4-a716-446655440001"
                   stats:
-                    fetched: 86
-                    scored: 86
-                    passed: 30
-                    dedup_removed: 5
-                    final_count: 25
+                    fetched: 25
+                    scored: 25
+                    passed: 12
+                    dedup_removed: 2
+                    final_count: 10
+                    with_images: 10
+
+  /longimage/{briefing_id}:
+    get:
+      summary: "[B] 获取简报长图"
+      parameters:
+        - name: briefing_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: PNG 长图文件
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
 
   # ============================================================
-  # 模块 C — 微信小程序 (:8003)
+  # 模块 C — 微信公众号 + 用户偏好 (:8003)
   # ============================================================
   /push:
     post:
-      summary: "[C] 批量推送订阅消息"
+      summary: "[C] 个性化批量推送"
       description: |
-        C 模块业务入口。读取最新简报，向所有已订阅用户推送微信订阅消息。
-        由 E 调度器在简报生成后调用。
+        根据每个用户的 preferences.tags 匹配内容并推送。
+        无标签用户推默认综合简报。
       requestBody:
         required: true
         content:
@@ -154,6 +175,10 @@ paths:
                 type:
                   type: string
                   enum: [morning, evening]
+                briefing_id:
+                  type: string
+                  format: uuid
+                  description: 可选，不传则取最新
               example:
                 type: morning
       responses:
@@ -168,57 +193,158 @@ paths:
                     type: string
                   pushed:
                     type: integer
+                  personalized:
+                    type: integer
+                  default_fallback:
+                    type: integer
                   failed:
                     type: integer
                 example:
                   status: ok
                   pushed: 150
+                  personalized: 120
+                  default_fallback: 30
                   failed: 3
 
-  /api/briefings/latest:
+  /weixin/callback:
     get:
-      summary: "[C] 获取最新一期简报"
+      summary: "[C] 微信公众号服务器验证"
+      description: 微信服务器发出的签名验证请求
       parameters:
-        - name: type
+        - name: signature
           in: query
+          required: true
           schema:
             type: string
-            enum: [morning, evening]
+        - name: timestamp
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: echostr
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: 简报数据
+          description: 返回 echostr 表示验证通过
+    post:
+      summary: "[C] 微信公众号消息事件接收"
+      description: |
+        接收用户消息（关注/取关/文字）。
+        必须是异步处理 — 5秒内返回空响应。
+      responses:
+        "200":
+          description: 空字符串（立即返回，异步处理消息）
 
-  /api/briefings/history:
+  /api/tags:
     get:
-      summary: "[C] 历史简报列表"
+      summary: "[C] 获取可用标签列表"
+      responses:
+        "200":
+          description: 标签列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tags:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tag:
+                          type: string
+                        label_zh:
+                          type: string
+                        description:
+                          type: string
+                example:
+                  tags:
+                    - tag: "LLM"
+                      label_zh: "大模型"
+                      description: "LLM/ChatGPT/Claude等"
+
+  /api/user/preferences:
+    get:
+      summary: "[C] 获取用户偏好"
       parameters:
-        - name: page
+        - name: openid
           in: query
+          required: true
           schema:
-            type: integer
-            default: 1
-        - name: size
-          in: query
+            type: string
+      responses:
+        "200":
+          description: 用户偏好
+    post:
+      summary: "[C] 设置用户偏好"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [openid, tags]
+              properties:
+                openid:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+              example:
+                openid: "test_openid_user_001"
+                tags: ["LLM", "开源", "Agent"]
+
+  /api/user/{openid}/profile:
+    get:
+      summary: "[C] 获取用户画像"
+      parameters:
+        - name: openid
+          in: path
+          required: true
           schema:
-            type: integer
-            default: 20
+            type: string
       responses:
         "200":
-          description: 分页列表
+          description: 用户画像（标签 + 近期点击 + 权重）
 
-  /api/subscribe:
+  /api/behavior:
     post:
-      summary: "[C] 用户订阅"
-      responses:
-        "200":
-          description: 订阅成功
-
-  /api/unsubscribe:
-    post:
-      summary: "[C] 取消订阅"
-      responses:
-        "200":
-          description: 取消成功
+      summary: "[C] 上报用户行为"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [openid, briefing_id, action]
+              properties:
+                openid:
+                  type: string
+                briefing_id:
+                  type: string
+                  format: uuid
+                item_index:
+                  type: integer
+                item_title:
+                  type: string
+                item_url:
+                  type: string
+                item_tags:
+                  type: array
+                  items:
+                    type: string
+                action:
+                  type: string
+                  enum: [click, view, share, dismiss]
 
   # ============================================================
   # 模块 D — 多平台发布 (:8004)
@@ -227,8 +353,7 @@ paths:
     post:
       summary: "[D] 发布简报到各平台"
       description: |
-        D 模块唯一业务入口。读取 briefings 表中指定简报，转换格式后发布到各平台。
-        由 E 调度器在简报生成后调用。
+        发布 + 长图生成。支持 dry_run 模式。
       requestBody:
         required: true
         content:
@@ -245,53 +370,21 @@ paths:
                   items:
                     type: string
                     enum: [zhihu, csdn, weixin_oa]
-                  default: ["zhihu", "csdn", "weixin_oa"]
+                  default: ["weixin_oa"]
+                dry_run:
+                  type: boolean
+                  default: false
               example:
                 briefing_id: "660e8400-e29b-41d4-a716-446655440001"
-                platforms: ["zhihu", "csdn", "weixin_oa"]
-      responses:
-        "200":
-          description: 发布完成（各平台独立结果）
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  briefing_id:
-                    type: string
-                  results:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        platform:
-                          type: string
-                        status:
-                          type: string
-                          enum: [success, pending, failed]
-                        url:
-                          type: string
-                        error:
-                          type: string
-                example:
-                  briefing_id: "660e8400-e29b-41d4-a716-446655440001"
-                  results:
-                    - platform: zhihu
-                      status: success
-                      url: "https://zhuanlan.zhihu.com/p/xxx"
-                    - platform: csdn
-                      status: failed
-                      error: "API rate limit exceeded"
-                    - platform: weixin_oa
-                      status: success
-                      url: "https://mp.weixin.qq.com/s/xxx"
+                platforms: ["weixin_oa"]
+                dry_run: true
 
   # ============================================================
   # 模块 E — 调度管理 (:8005)
   # ============================================================
   /admin/trigger:
     post:
-      summary: "[E] 手动触发全链路"
+      summary: "[E] 手动触发全链路（文档）"
       parameters:
         - name: type
           in: query
@@ -300,11 +393,108 @@ paths:
             enum: [morning, evening]
       responses:
         "200":
-          description: 触发成功，返回全链路执行结果
+          description: 触发成功
+
+  /admin/trigger-video:
+    post:
+      summary: "[E] 手动触发视频生成"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  default: "ai_agent_weekly"
+                date:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: 触发视频生成
 
   /admin/overview:
     get:
       summary: "[E] 运行总览"
       responses:
         "200":
-          description: 今日早晚报状态、各模块最近运行记录
+          description: 早晚报状态 + 各模块最近运行记录 + 用户活跃数据
+
+  /admin/users:
+    get:
+      summary: "[E] 用户数据概览"
+      responses:
+        "200":
+          description: 标签分布 + 活跃用户数 + 行为统计
+
+  # ============================================================
+  # 模块 F — 视频生成 (:8006)
+  # ============================================================
+  /generate:
+    post:
+      summary: "[F] 触发视频生成"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  default: "ai_agent_weekly"
+                date:
+                  type: string
+                  format: date
+              example:
+                type: "ai_agent_weekly"
+                date: "2026-05-27"
+      responses:
+        "200":
+          description: 开始生成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  video_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [pending, processing]
+                  message:
+                    type: string
+
+  /status/{video_id}:
+    get:
+      summary: "[F] 查询视频状态"
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 视频状态
+
+  /videos:
+    get:
+      summary: "[F] 视频列表"
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: 视频列表

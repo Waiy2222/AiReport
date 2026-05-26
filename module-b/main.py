@@ -1,5 +1,6 @@
 """Module B — AI 内容加工 (:8002)"""
 import uuid
+import logging
 from datetime import date
 
 from fastapi import FastAPI, HTTPException
@@ -7,6 +8,9 @@ from pydantic import BaseModel
 
 from db import get_pool, init_db, close_db
 from pipeline import run_pipeline
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [B] %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Module B - AI Content Processor")
 

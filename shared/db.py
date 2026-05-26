@@ -1,4 +1,4 @@
-"""PostgreSQL 连接管理（asyncpg）"""
+"""PostgreSQL connection pool (asyncpg) — shared by all modules."""
 import json
 import os
 import asyncpg

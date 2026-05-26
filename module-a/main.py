@@ -7,6 +7,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from db import get_pool, init_db, close_db
+from scrapers import SCRAPERS
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,13 @@ async def health():
         return {"status": "ok", "db": "connected"}
     except Exception:
         return {"status": "ok", "db": "disconnected"}
+
+
+def _get_pool_or_503():
+    try:
+        return get_pool()
+    except RuntimeError:
+        raise HTTPException(503, "database not initialized")
 
 
 @app.post("/run")

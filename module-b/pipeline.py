@@ -1,4 +1,4 @@
-"""七步管道串联 — 读 raw_items → AI 加工 → 写 briefings"""
+"""七步管道串联 — 读 raw_items → AI 加工 → 配图 → 写 briefings"""
 import json
 import uuid
 import asyncpg
@@ -7,6 +7,7 @@ from ai.analyzer import batch_score
 from ai.dedup import url_dedup, semantic_dedup
 from ai.enricher import enrich
 from ai.summarizer import summarize
+from ai.image_matcher import match_images_for_briefing
 
 SCORE_THRESHOLD = 6
 
@@ -20,6 +21,35 @@ async def read_raw_items(pool: asyncpg.Pool, batch_id: uuid.UUID) -> list[dict]:
             batch_id,
         )
     return [dict(r) for r in rows]
+
+
+async def _insert_briefing(conn, briefing_type: str, briefing_date: str,
+                           briefing: dict, stats: dict) -> uuid.UUID:
+    """写入 briefings 表——upsert 处理重复运行"""
+    briefing_id = uuid.uuid4()
+    headline = briefing.get("headline", {})
+    merged_stats = dict(stats)
+    if headline:
+        merged_stats["headline"] = headline
+
+    await conn.execute(
+        "INSERT INTO briefings (id, type, date, tl_dr, sections, key_takeaways, raw_stats) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7) "
+        "ON CONFLICT (type, date, language) DO UPDATE SET "
+        "  tl_dr = EXCLUDED.tl_dr, "
+        "  sections = EXCLUDED.sections, "
+        "  key_takeaways = EXCLUDED.key_takeaways, "
+        "  raw_stats = EXCLUDED.raw_stats, "
+        "  generated_at = now()",
+        briefing_id,
+        briefing_type,
+        briefing_date,
+        json.dumps(briefing.get("tl_dr", []), ensure_ascii=False),
+        json.dumps(briefing.get("sections", []), ensure_ascii=False),
+        json.dumps(briefing.get("key_takeaways", []), ensure_ascii=False),
+        json.dumps(merged_stats, ensure_ascii=False),
+    )
+    return briefing_id
 
 
 async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: str, batch_id: uuid.UUID) -> dict:
@@ -37,14 +67,9 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
     items = await read_raw_items(pool, batch_id)
     stats["fetched"] = len(items)
     if not items:
-        briefing_id = uuid.uuid4()
         async with pool.acquire() as conn:
-            await conn.execute(
-                "INSERT INTO briefings (id, type, date, tl_dr, sections, key_takeaways, raw_stats) "
-                "VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                briefing_id, briefing_type, briefing_date, "[]", "[]", "[]", json.dumps(stats),
-            )
-        return {"briefing_id": briefing_id, "stats": stats}
+            briefing_id = await _insert_briefing(conn, briefing_type, briefing_date, {"tl_dr": [], "sections": [], "key_takeaways": []}, stats)
+        return {"briefing_id": briefing_id, "stats": stats, "briefing": {}}
 
     # ② AI 评分
     items = await batch_score(items)
@@ -55,14 +80,9 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
     stats["passed"] = len(passed)
 
     if not passed:
-        briefing_id = uuid.uuid4()
         async with pool.acquire() as conn:
-            await conn.execute(
-                "INSERT INTO briefings (id, type, date, tl_dr, sections, key_takeaways, raw_stats) "
-                "VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                briefing_id, briefing_type, briefing_date, "[]", "[]", "[]", json.dumps(stats),
-            )
-        return {"briefing_id": briefing_id, "stats": stats}
+            briefing_id = await _insert_briefing(conn, briefing_type, briefing_date, {"tl_dr": [], "sections": [], "key_takeaways": []}, stats)
+        return {"briefing_id": briefing_id, "stats": stats, "briefing": {}}
 
     # ④ URL 精确去重
     before_url = len(passed)
@@ -77,23 +97,15 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
     # ⑥ 背景补充
     passed = await enrich(passed)
 
-    # ⑦ 摘要 + 标签生成
+    # ⑦ 摘要 + 标签生成（V2: 含 headline + image_keywords）
     briefing = await summarize(passed, briefing_type)
-    stats["final_count"] = len(passed)
 
-    # ⑧ 写入 briefings 表
-    briefing_id = uuid.uuid4()
+    # ⑧ 配图匹配（为 sections 中每条 item 匹配 image_url）
+    briefing = await match_images_for_briefing(briefing)
+    stats["final_count"] = sum(len(s.get("items", [])) for s in briefing.get("sections", []))
+
+    # ⑨ 写入 briefings 表（upsert 防重复，headline 存入 raw_stats）
     async with pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO briefings (id, type, date, tl_dr, sections, key_takeaways, raw_stats) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            briefing_id,
-            briefing_type,
-            briefing_date,
-            json.dumps(briefing.get("tl_dr", []), ensure_ascii=False),
-            json.dumps(briefing.get("sections", []), ensure_ascii=False),
-            json.dumps(briefing.get("key_takeaways", []), ensure_ascii=False),
-            json.dumps(stats, ensure_ascii=False),
-        )
+        briefing_id = await _insert_briefing(conn, briefing_type, briefing_date, briefing, stats)
 
-    return {"briefing_id": briefing_id, "stats": stats}
+    return {"briefing_id": briefing_id, "stats": stats, "briefing": briefing}

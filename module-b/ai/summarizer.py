@@ -1,13 +1,13 @@
-"""摘要 + 标签生成 — 生成结构化简报内容"""
+"""摘要 + 标签生成 — 生成结构化简报内容（V2：含 headline + image_keywords）"""
 import json
 from .client import get_client, DEEPSEEK_MODEL
 from .prompts import get_summary_system, summary_user
 
 
 async def summarize(items: list[dict], briefing_type: str) -> dict:
-    """生成简报的 tl_dr / sections / key_takeaways"""
+    """生成简报的 headline / tl_dr / sections / key_takeaways"""
     if not items:
-        return {"tl_dr": [], "sections": [], "key_takeaways": []}
+        return {"headline": {}, "tl_dr": [], "sections": [], "key_takeaways": []}
 
     client = get_client()
     indexed = []
@@ -36,12 +36,14 @@ async def summarize(items: list[dict], briefing_type: str) -> dict:
         )
         result = json.loads(resp.choices[0].message.content)
         return {
+            "headline": result.get("headline", {}),
             "tl_dr": result.get("tl_dr", []),
             "sections": result.get("sections", []),
             "key_takeaways": result.get("key_takeaways", []),
         }
     except Exception as e:
         return {
+            "headline": {},
             "tl_dr": [f"处理异常: {e}"],
             "sections": [],
             "key_takeaways": [],

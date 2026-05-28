@@ -55,7 +55,7 @@ def enrich_user(items_json: str) -> str:
 {items_json}"""
 
 
-# ── 摘要生成 Prompt ──
+# ── 摘要生成 Prompt（V2 结构优化） ──
 MORNING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的早报编辑。当前时间：早上 8:00。
 
 **早报侧重点**：
@@ -66,10 +66,11 @@ MORNING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的早报编辑。当前时间
 
 基于输入的资讯列表，生成结构化早报。返回 JSON：
 {
-  "tl_dr": ["要点1", "要点2", ...],       // 10-15条一句话要点，按重要性排序
+  "headline": {"title": "本期头条标题", "summary": "1-2句话推荐理由", "item_index": 0},
+  "tl_dr": ["要点1", "要点2", ...],       // 5-10条一句话核心要点，按重要性排序
   "sections": [
     {
-      "title": "分类标题",
+      "section_title": "分类标题",
       "items": [
         {
           "title": "条目标题",
@@ -77,7 +78,8 @@ MORNING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的早报编辑。当前时间
           "score": 8.5,
           "url": "原文链接",
           "source": "来源",
-          "tags": ["标签1", "标签2"]
+          "tags": ["标签1", "标签2"],
+          "image_keywords": "English keywords for image search, e.g. robot AI agent"
         }
       ]
     }
@@ -86,7 +88,8 @@ MORNING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的早报编辑。当前时间
 }
 
 分类建议：大模型开源动态、Agent与智能体框架、AI工具链与基础设施、AI政策与行业动态
-tags 从以下选择：LLM, Agent, 开源, 推理, RAG, 多模态, 基础设施, 融资, 政策, 框架, 工具, SDK"""
+tags 从以下选择：LLM, Agent, 开源, 推理, RAG, 多模态, 基础设施, 融资, 政策, 框架, 工具, SDK
+image_keywords 必须是英文，2-4个词，用于 Unsplash 图片搜索"""
 
 EVENING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的晚报编辑。当前时间：晚上 20:00。
 
@@ -98,10 +101,11 @@ EVENING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的晚报编辑。当前时间
 
 基于输入的资讯列表，生成结构化晚报。返回 JSON：
 {
-  "tl_dr": ["要点1", "要点2", ...],       // 10-15条一句话要点，按重要性排序
+  "headline": {"title": "本期头条标题", "summary": "1-2句话推荐理由", "item_index": 0},
+  "tl_dr": ["要点1", "要点2", ...],       // 5-10条一句话核心要点，按重要性排序
   "sections": [
     {
-      "title": "分类标题",
+      "section_title": "分类标题",
       "items": [
         {
           "title": "条目标题",
@@ -109,7 +113,8 @@ EVENING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的晚报编辑。当前时间
           "score": 8.5,
           "url": "原文链接",
           "source": "来源",
-          "tags": ["标签1", "标签2"]
+          "tags": ["标签1", "标签2"],
+          "image_keywords": "English keywords for image search, e.g. startup funding AI"
         }
       ]
     }
@@ -118,7 +123,8 @@ EVENING_SUMMARY_SYSTEM = """你是 AI/Agent 领域的晚报编辑。当前时间
 }
 
 分类建议：今日重磅发布、开发者社区热榜、AI投融资、行业政策与观点
-tags 从以下选择：LLM, Agent, 开源, 推理, RAG, 多模态, 基础设施, 融资, 政策, 框架, 工具, SDK"""
+tags 从以下选择：LLM, Agent, 开源, 推理, RAG, 多模态, 基础设施, 融资, 政策, 框架, 工具, SDK
+image_keywords 必须是英文，2-4个词，用于 Unsplash 图片搜索"""
 
 
 def summary_user(items_json: str, briefing_type: str) -> str:

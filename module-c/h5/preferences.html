@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI资讯偏好设置</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+            padding: 20px 16px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .header p {
+            font-size: 13px;
+            color: #888;
+            margin-top: 6px;
+        }
+        .tag-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1.5px solid #ddd;
+            background: #fff;
+            font-size: 14px;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tag-chip:active {
+            transform: scale(0.95);
+        }
+        .tag-chip.selected {
+            background: #07c160;
+            border-color: #07c160;
+            color: #fff;
+            font-weight: 500;
+        }
+        .tag-chip .desc {
+            display: block;
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 2px;
+        }
+        .tag-chip.selected .desc {
+            color: rgba(255,255,255,0.8);
+        }
+        .submit-btn {
+            display: block;
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #07c160;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .submit-btn:active {
+            background: #06ad56;
+        }
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 999;
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+        .selected-count {
+            text-align: center;
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 16px;
+        }
+        .selected-count span {
+            color: #07c160;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI资讯偏好设置</h1>
+        <p>选择你感兴趣的标签，我们将为你推送个性化内容</p>
+    </div>
+
+    <div id="loading" class="loading">加载中...</div>
+
+    <div id="content" style="display:none;">
+        <div class="selected-count">已选 <span id="count">0</span> 个标签</div>
+        <div class="tag-grid" id="tagGrid"></div>
+        <button class="submit-btn" id="submitBtn" onclick="savePreferences()">保存设置</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let openid = '';
+        let selectedTags = new Set();
+
+        // 从 URL 获取 openid
+        function getOpenid() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('openid') || '';
+        }
+
+        // 显示 toast
+        function showToast(msg, duration) {
+            duration = duration || 2000;
+            var el = document.getElementById('toast');
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(function() { el.style.display = 'none'; }, duration);
+        }
+
+        // 加载标签列表
+        async function loadTags() {
+            try {
+                var resp = await fetch(API_BASE + '/api/tags');
+                var data = await resp.json();
+                return data.tags || [];
+            } catch (e) {
+                console.error('Failed to load tags:', e);
+                return [];
+            }
+        }
+
+        // 加载用户当前偏好
+        async function loadPreferences() {
+            try {
+                var resp = await fetch(API_BASE + '/api/user/preferences?openid=' + encodeURIComponent(openid));
+                var data = await resp.json();
+                return data.tags || [];
+            } catch (e) {
+                console.error('Failed to load preferences:', e);
+                return [];
+            }
+        }
+
+        // 渲染标签
+        function renderTags(tags, currentTags) {
+            var grid = document.getElementById('tagGrid');
+            grid.innerHTML = '';
+
+            tags.forEach(function(tag) {
+                var chip = document.createElement('div');
+                chip.className = 'tag-chip';
+                chip.dataset.tag = tag.tag;
+
+                if (currentTags.indexOf(tag.tag) >= 0) {
+                    chip.classList.add('selected');
+                    selectedTags.add(tag.tag);
+                }
+
+                chip.innerHTML = '<div><div>' + tag.label_zh + '</div><div class="desc">' + (tag.description || '') + '</div></div>';
+
+                chip.addEventListener('click', function() {
+                    if (selectedTags.has(tag.tag)) {
+                        selectedTags.delete(tag.tag);
+                        chip.classList.remove('selected');
+                    } else {
+                        selectedTags.add(tag.tag);
+                        chip.classList.add('selected');
+                    }
+                    updateCount();
+                });
+
+                grid.appendChild(chip);
+            });
+
+            updateCount();
+        }
+
+        function updateCount() {
+            document.getElementById('count').textContent = selectedTags.size;
+        }
+
+        // 保存偏好
+        async function savePreferences() {
+            var btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+
+            try {
+                var resp = await fetch(API_BASE + '/api/user/preferences', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        openid: openid,
+                        tags: Array.from(selectedTags)
+                    })
+                });
+
+                if (resp.ok) {
+                    showToast('保存成功！');
+                    setTimeout(function() {
+                        // 尝试关闭微信 WebView
+                        if (window.WeixinJSBridge) {
+                            WeixinJSBridge.call('closeWindow');
+                        }
+                    }, 1500);
+                } else {
+                    showToast('保存失败，请重试');
+                }
+            } catch (e) {
+                showToast('网络错误，请重试');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '保存设置';
+        }
+
+        // 初始化
+        (async function init() {
+            openid = getOpenid();
+            if (!openid) {
+                document.getElementById('loading').textContent = '缺少 openid 参数';
+                return;
+            }
+
+            var tags = await loadTags();
+            if (tags.length === 0) {
+                document.getElementById('loading').textContent = '暂无可用标签';
+                return;
+            }
+
+            var currentTags = await loadPreferences();
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+
+            renderTags(tags, currentTags);
+        })();
+    </script>
+</body>
+</html>

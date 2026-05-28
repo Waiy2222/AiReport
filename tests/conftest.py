@@ -66,6 +66,11 @@ def mock_httpx_client():
         yield mock
 
 
+@pytest.fixture(params=["asyncio"])
+def anyio_backend(request):
+    return request.param
+
+
 @pytest.fixture(autouse=True)
 def clean_env():
     """Reset environment variables before each test."""

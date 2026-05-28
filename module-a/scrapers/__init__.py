@@ -15,7 +15,7 @@ async def _insert_items(
     items: list[dict],
     batch_id,
 ) -> int:
-    """Insert a batch of items into raw_items, skipping duplicates on url.
+    """Insert items into raw_items, skipping duplicates on url.
 
     Returns the count of newly inserted rows.
     """
@@ -57,14 +57,14 @@ async def _insert_items(
     return count
 
 
-# Each scraper module exposes an async function with this signature:
-#   async def fetch(pool, since: datetime, batch_id) -> int
-
-from . import github, hackernews, rss, reddit  # noqa: E402
+from .github import fetch as github_fetch
+from .hackernews import fetch as hackernews_fetch
+from .rss import fetch as rss_fetch
+from .reddit import fetch as reddit_fetch
 
 SCRAPERS = {
-    "github": github.fetch,
-    "hackernews": hackernews.fetch,
-    "rss": rss.fetch,
-    "reddit": reddit.fetch,
+    "github": github_fetch,
+    "hackernews": hackernews_fetch,
+    "rss": rss_fetch,
+    "reddit": reddit_fetch,
 }

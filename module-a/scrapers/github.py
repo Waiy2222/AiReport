@@ -95,3 +95,8 @@ def _parse_github_time(time_str: str) -> datetime:
         return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
         return datetime.now(timezone.utc)
+
+
+async def fetch(pool, since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
+    """标准 scraper 接口（集成测试需要）"""
+    return await fetch_github(since, batch_id)

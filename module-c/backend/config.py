@@ -15,6 +15,15 @@ class Settings:
     # 订阅消息模板 ID（在微信公众平台申请）
     WX_TEMPLATE_ID: str = os.getenv("WX_TEMPLATE_ID", "")
 
+    # 微信公众号（Phase 2 新增）
+    WX_OA_TOKEN: str = os.getenv("WX_OA_TOKEN", "")
+    WX_OA_APPID: str = os.getenv("WX_OA_APPID", "")
+    WX_OA_SECRET: str = os.getenv("WX_OA_SECRET", "")
+    WX_OA_ENCODING_AES_KEY: str = os.getenv("WX_OA_ENCODING_AES_KEY", "")
+
+    # H5 基础地址（用于生成偏好设置链接）
+    H5_BASE_URL: str = os.getenv("H5_BASE_URL", "http://localhost:8003/h5")
+
     # 服务端口
     PORT: int = int(os.getenv("PORT", "8003"))
 

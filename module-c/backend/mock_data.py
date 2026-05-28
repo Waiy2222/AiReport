@@ -1,5 +1,6 @@
 """内置假数据 — 无 PostgreSQL 时自动使用，与 seed_data.sql 一致"""
 import copy
+from datetime import datetime, timedelta
 
 BRIEFINGS = [
     {
@@ -185,3 +186,100 @@ def get_briefings():
 
 def get_subscriptions():
     return copy.deepcopy(MOCK_SUBSCRIPTIONS)
+
+
+# ── Phase 2 新增假数据 ──────────────────────────────────────────
+
+TAG_CATALOG = [
+    {"tag": "LLM", "category": "topic", "label_zh": "大模型", "description": "LLM/ChatGPT/Claude/Gemini等", "sort_order": 1},
+    {"tag": "开源", "category": "topic", "label_zh": "开源项目", "description": "开源框架、工具、模型", "sort_order": 2},
+    {"tag": "Python", "category": "topic", "label_zh": "Python", "description": "Python生态/AI开发", "sort_order": 3},
+    {"tag": "AI安全", "category": "topic", "label_zh": "AI安全", "description": "对齐/红队/鲁棒性", "sort_order": 4},
+    {"tag": "Agent", "category": "topic", "label_zh": "智能体", "description": "AI Agent/多Agent协作", "sort_order": 5},
+    {"tag": "AI产品", "category": "topic", "label_zh": "AI产品", "description": "AI应用/商业化/SaaS", "sort_order": 6},
+    {"tag": "RAG", "category": "topic", "label_zh": "RAG", "description": "检索增强生成", "sort_order": 7},
+    {"tag": "多模态", "category": "topic", "label_zh": "多模态", "description": "视觉/语音/视频理解", "sort_order": 8},
+    {"tag": "AI编程", "category": "topic", "label_zh": "AI编程", "description": "Copilot/IDE/代码生成", "sort_order": 9},
+    {"tag": "AI政策", "category": "topic", "label_zh": "AI政策", "description": "监管/合规/政策/伦理", "sort_order": 10},
+    {"tag": "融资", "category": "topic", "label_zh": "融资并购", "description": "AI创投/融资/acquisition", "sort_order": 11},
+    {"tag": "基础设施", "category": "topic", "label_zh": "基础设施", "description": "GPU/推理/部署/向量数据库", "sort_order": 12},
+]
+
+MOCK_USER_PREFERENCES = {
+    "mock_openid_user_001": {"tags": ["LLM", "开源", "Agent"]},
+    "mock_openid_user_002": {"tags": ["Python", "AI编程"]},
+    "mock_openid_user_003": {"tags": []},  # 无标签，冷启动用户
+}
+
+_now = datetime.utcnow()
+
+MOCK_BEHAVIORS = [
+    {
+        "id": "beh-001",
+        "user_openid": "mock_openid_user_001",
+        "briefing_id": "b0000001-0000-0000-0000-000000000001",
+        "item_index": 0,
+        "item_title": "Meta开源Llama-4-R1推理增强模型",
+        "item_url": "https://github.com/meta-llama/llama4",
+        "item_tags": ["LLM", "开源", "推理"],
+        "action": "click",
+        "created_at": (_now - timedelta(days=1)).isoformat(),
+    },
+    {
+        "id": "beh-002",
+        "user_openid": "mock_openid_user_001",
+        "briefing_id": "b0000001-0000-0000-0000-000000000001",
+        "item_index": 3,
+        "item_title": "Google Gemini 3.0首次支持Agent原生能力",
+        "item_url": "https://blog.google/technology/ai/gemini-3-agent/",
+        "item_tags": ["Agent", "Gemini", "多模态"],
+        "action": "click",
+        "created_at": (_now - timedelta(days=1)).isoformat(),
+    },
+    {
+        "id": "beh-003",
+        "user_openid": "mock_openid_user_001",
+        "briefing_id": "b0000001-0000-0000-0000-000000000001",
+        "item_index": 1,
+        "item_title": "DeepSeek-V4技术报告解读",
+        "item_url": "https://news.ycombinator.com/item?id=40000001",
+        "item_tags": ["LLM", "开源", "MoE"],
+        "action": "share",
+        "created_at": (_now - timedelta(hours=12)).isoformat(),
+    },
+    {
+        "id": "beh-004",
+        "user_openid": "mock_openid_user_002",
+        "briefing_id": "b0000001-0000-0000-0000-000000000001",
+        "item_index": 4,
+        "item_title": "CrewAI v1.0正式版发布",
+        "item_url": "https://github.com/crewAIInc/crewAI",
+        "item_tags": ["Agent", "框架", "开源"],
+        "action": "click",
+        "created_at": (_now - timedelta(days=2)).isoformat(),
+    },
+    {
+        "id": "beh-005",
+        "user_openid": "mock_openid_user_002",
+        "briefing_id": "b0000001-0000-0000-0000-000000000002",
+        "item_index": 0,
+        "item_title": "Claude Opus 4.6发布",
+        "item_url": "https://example.com/claude-4-6",
+        "item_tags": ["LLM", "Anthropic"],
+        "action": "view",
+        "created_at": (_now - timedelta(days=3)).isoformat(),
+    },
+]
+
+
+def get_tags():
+    return copy.deepcopy(TAG_CATALOG)
+
+
+def get_user_preferences(openid: str) -> dict | None:
+    prefs = MOCK_USER_PREFERENCES.get(openid)
+    return copy.deepcopy(prefs) if prefs else None
+
+
+def get_user_behaviors(openid: str) -> list[dict]:
+    return [copy.deepcopy(b) for b in MOCK_BEHAVIORS if b["user_openid"] == openid]

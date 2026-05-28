@@ -1,4 +1,4 @@
-"""Module A — 资讯抓取 (:8001)"""
+"""Module A — 资讯抓取 + LLM 智能筛选 (:8001)"""
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -7,15 +7,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from db import get_pool, init_db, close_db
-from scrapers import SCRAPERS
+from scrapers import SCRAPERS, _insert_items
 
 logger = logging.getLogger(__name__)
-
-logger = logging.getLogger(__name__)
-
 app = FastAPI(title="Module A - News Fetcher")
 
-SOURCES = ["github", "hackernews", "rss"]  # reddit/twitter 为可选 P1，按需添加
+SOURCES = ["github", "hackernews", "rss"]
 
 
 @app.on_event("startup")
@@ -23,7 +20,7 @@ async def startup():
     try:
         await init_db()
     except Exception:
-        pass  # 允许无 DB 启动，/health 会报告状态
+        pass
 
 
 @app.on_event("shutdown")
@@ -48,31 +45,47 @@ async def health():
 
 
 def _get_pool_or_503():
+    """获取数据库连接池，未初始化则抛 503"""
     try:
         return get_pool()
     except RuntimeError:
         raise HTTPException(503, "database not initialized")
 
 
+async def _fetch_source(pool, source: str, since: datetime, batch_id: uuid.UUID) -> int:
+    """调度单个 scraper 并返回抓取条目数（DB 写入由 orchestrator.run_pipeline 统一处理）。
+
+    注意：此函数仅用于集成测试验证 scraper 调度逻辑。
+    生产流程走 orchestrator.run_pipeline → run_all_scrapers → bulk_insert。
+    """
+    scraper = SCRAPERS.get(source)
+    if scraper is None:
+        logger.warning(f"Unknown scraper: {source}")
+        return 0
+    try:
+        items = await scraper(pool, since, batch_id)
+        return len(items)
+    except Exception as e:
+        logger.warning(f"Scraper [{source}] failed: {e}")
+        return 0
+
+
 @app.post("/run")
 async def run(req: FetchRequest):
+    pool = _get_pool_or_503()
     since = datetime.now(timezone.utc) - timedelta(hours=req.hours_back)
-    pool = get_pool()
 
-    from orchestrator import run_all_scrapers, bulk_insert
+    from orchestrator import run_pipeline
 
-    # 并发抓取
-    items, per_source = await run_all_scrapers(since, req.batch_id, SOURCES)
+    result = await run_pipeline(pool, since, req.batch_id, SOURCES)
 
-    # 批量写入数据库
-    inserted = await bulk_insert(pool, items)
-
-    all_zero = all(v == 0 for v in per_source.values())
+    all_zero = all(v == 0 for v in result["per_source"].values())
     status = "partial" if all_zero else "ok"
 
     return {
         "status": status,
-        "fetched": inserted,
+        "fetched": result["fetched"],
+        "llm_filtered": result["llm_filtered"],
         "batch_id": str(req.batch_id),
-        "per_source": per_source,
+        "per_source": result["per_source"],
     }

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 750px;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0f1724;
+    color: #e2e8f0;
+    line-height: 1.7;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    padding: 48px 40px 40px;
+    text-align: center;
+    border-bottom: 2px solid #3b82f6;
+  }
+  .header .badge {
+    display: inline-block;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 6px 20px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    letter-spacing: 2px;
+  }
+  .header .date {
+    font-size: 15px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #f1f5f9;
+    margin-bottom: 12px;
+  }
+  .header .subtitle {
+    font-size: 16px;
+    color: #94a3b8;
+  }
+
+  /* ── Headline ── */
+  .headline {
+    margin: 32px 40px;
+    padding: 28px 32px;
+    background: linear-gradient(135deg, #1e293b, #1a2332);
+    border-left: 4px solid #f59e0b;
+    border-radius: 0 12px 12px 0;
+  }
+  .headline .label {
+    font-size: 13px;
+    color: #f59e0b;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .headline h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 8px;
+  }
+  .headline p {
+    font-size: 15px;
+    color: #cbd5e1;
+  }
+
+  /* ── TL;DR ── */
+  .tldr {
+    margin: 32px 40px;
+    padding: 24px 28px;
+    background: #1e293b;
+    border-radius: 12px;
+  }
+  .tldr h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #3b82f6;
+    margin-bottom: 14px;
+  }
+  .tldr ol {
+    padding-left: 24px;
+  }
+  .tldr li {
+    font-size: 15px;
+    color: #cbd5e1;
+    margin-bottom: 8px;
+  }
+
+  /* ── Sections ── */
+  .sections {
+    margin: 0 40px;
+  }
+  .section {
+    margin-bottom: 36px;
+  }
+  .section-title {
+    font-size: 21px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #334155;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 24px;
+    background: #3b82f6;
+    border-radius: 3px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: #1e293b;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .card img {
+    width: 100%;
+    height: 320px;
+    object-fit: cover;
+    display: block;
+  }
+  .card-body {
+    padding: 20px 24px;
+  }
+  .card-body h4 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 8px;
+  }
+  .card-body .summary {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 12px;
+    line-height: 1.6;
+  }
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .card-meta .tag {
+    display: inline-block;
+    background: #334155;
+    color: #94a3b8;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+  .card-meta .source {
+    font-size: 12px;
+    color: #64748b;
+  }
+  .card-meta .score {
+    font-size: 12px;
+    color: #f59e0b;
+    font-weight: 700;
+  }
+
+  /* ── Key Takeaways ── */
+  .takeaways {
+    margin: 32px 40px;
+    padding: 24px 28px;
+    background: linear-gradient(135deg, #1a2332, #1e293b);
+    border-radius: 12px;
+    border: 1px solid #334155;
+  }
+  .takeaways h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f59e0b;
+    margin-bottom: 14px;
+  }
+  .takeaways ul {
+    list-style: none;
+    padding: 0;
+  }
+  .takeaways li {
+    font-size: 15px;
+    color: #cbd5e1;
+    margin-bottom: 10px;
+    padding-left: 20px;
+    position: relative;
+  }
+  .takeaways li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: #f59e0b;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 36px 40px 48px;
+    color: #475569;
+    font-size: 13px;
+  }
+  .footer .divider {
+    width: 60px;
+    height: 2px;
+    background: #334155;
+    margin: 0 auto 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="badge">{{ 'AI 早报' if briefing_type == 'morning' else 'AI 晚报' }}</div>
+  <div class="date">{{ briefing_date }}</div>
+  <h1>AI/Agent 领域资讯速览</h1>
+  <div class="subtitle">{{ final_count }} 条精选 · 聚焦 AI/Agent 领域</div>
+</div>
+
+{% if headline and headline.get('title') %}
+<div class="headline">
+  <div class="label">本期头条</div>
+  <h2>{{ headline.title }}</h2>
+  <p>{{ headline.summary }}</p>
+</div>
+{% endif %}
+
+{% if tl_dr %}
+<div class="tldr">
+  <h3>TL;DR · 核心要点</h3>
+  <ol>
+    {% for point in tl_dr %}
+    <li>{{ point }}</li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+
+<div class="sections">
+  {% for section in sections %}
+  <div class="section">
+    <div class="section-title">{{ section.section_title }}</div>
+    {% for item in section.items %}
+    <div class="card">
+      {% if item.get('image_url') %}
+      <img src="{{ item.image_url }}" alt="{{ item.title }}" />
+      {% endif %}
+      <div class="card-body">
+        <h4>{{ item.title }}</h4>
+        <div class="summary">{{ item.summary }}</div>
+        <div class="card-meta">
+          <span class="score">{{ item.score }} 分</span>
+          <span class="source">{{ item.source }}</span>
+          {% for tag in item.tags %}
+          <span class="tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+{% if key_takeaways %}
+<div class="takeaways">
+  <h3>关键洞察</h3>
+  <ul>
+    {% for t in key_takeaways %}
+    <li>{{ t }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="footer">
+  <div class="divider"></div>
+  <div>AI Report · 每日 AI/Agent 资讯速览</div>
+  <div>{{ generated_at }}</div>
+</div>
+
+</body>
+</html>

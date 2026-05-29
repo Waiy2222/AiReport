@@ -1,6 +1,9 @@
 """TDD: orchestrator.py — 调度器、去重、批量写入测试"""
 import uuid
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch, MagicMock
+
+import pytest
 
 from orchestrator import dedup_by_url
 
@@ -66,6 +69,107 @@ def test_dedup_preserves_order():
     ]
     result = dedup_by_url(items)
     assert [r["title"] for r in result] == ["Z", "A", "M"]
+
+
+# ── run_pipeline ──────────────────────────────────────────────────────────
+
+@pytest.mark.anyio(asyncio_mode="auto")
+async def test_run_pipeline_empty():
+    """空抓取 → 返回 0"""
+    from orchestrator import run_pipeline
+
+    pool = AsyncMock()
+    with patch("orchestrator.run_all_scrapers", new_callable=AsyncMock,
+               return_value=([], {"github": 0, "hackernews": 0, "rss": 0})):
+        result = await run_pipeline(pool, datetime.now(timezone.utc), uuid.uuid4(), ["github", "hackernews", "rss"])
+
+    assert result["fetched"] == 0
+    assert result["llm_filtered"] is False
+    assert "per_source" in result
+
+
+@pytest.mark.anyio(asyncio_mode="auto")
+async def test_run_pipeline_with_llm():
+    """Mock 全链路 → 返回 fetched + llm_filtered=True"""
+    from orchestrator import run_pipeline
+
+    pool = AsyncMock()
+    fake_items = [
+        {"title": "Test", "url": "https://a.com/1", "source": "github",
+         "content": "", "author": "", "published_at": datetime.now(timezone.utc),
+         "batch_id": uuid.uuid4(), "metadata": {}},
+    ]
+
+    with patch("orchestrator.run_all_scrapers", new_callable=AsyncMock,
+               return_value=(fake_items, {"github": 1, "hackernews": 0, "rss": 0})):
+        with patch("llm_filter.filter_and_enrich", new_callable=AsyncMock,
+                   return_value=(fake_items, True)):
+            with patch("orchestrator.bulk_insert", new_callable=AsyncMock,
+                       return_value=1):
+                result = await run_pipeline(pool, datetime.now(timezone.utc), uuid.uuid4(), ["github"])
+
+    assert result["fetched"] == 1
+    assert result["llm_filtered"] is True
+    assert result["per_source"]["github"] == 1
+
+
+# ── bulk_insert ───────────────────────────────────────────────────────────
+
+@pytest.mark.anyio(asyncio_mode="auto")
+async def test_bulk_insert_with_embedding():
+    """含 embedding 的 items → SQL 参数包含 embedding"""
+    from unittest.mock import MagicMock
+    from orchestrator import bulk_insert
+
+    mock_conn = AsyncMock()
+    mock_conn.executemany = AsyncMock(return_value="INSERT 0 1")
+
+    # pool.acquire() 必须返回 async context manager
+    mock_ctx = MagicMock()
+    mock_ctx.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_pool = MagicMock()
+    mock_pool.acquire.return_value = mock_ctx
+
+    items = [
+        {"source": "github", "title": "Test", "url": "https://a.com/1",
+         "content": "", "author": "", "published_at": datetime.now(timezone.utc),
+         "batch_id": uuid.uuid4(), "metadata": {}, "embedding": [0.1, 0.2, 0.3]},
+    ]
+    count = await bulk_insert(mock_pool, items)
+    assert count == 1
+    mock_conn.executemany.assert_called_once()
+    call_args = mock_conn.executemany.call_args
+    rows = call_args[0][1]
+    assert "[0.1,0.2,0.3]" in str(rows)
+
+
+@pytest.mark.anyio(asyncio_mode="auto")
+async def test_bulk_insert_without_embedding():
+    """无 embedding → embedding 参数为 None"""
+    from unittest.mock import MagicMock
+    from orchestrator import bulk_insert
+
+    mock_conn = AsyncMock()
+    mock_conn.executemany = AsyncMock(return_value="INSERT 0 1")
+
+    mock_ctx = MagicMock()
+    mock_ctx.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_pool = MagicMock()
+    mock_pool.acquire.return_value = mock_ctx
+
+    items = [
+        {"source": "github", "title": "Test", "url": "https://a.com/1",
+         "content": "", "author": "", "published_at": datetime.now(timezone.utc),
+         "batch_id": uuid.uuid4(), "metadata": {}},
+    ]
+    count = await bulk_insert(mock_pool, items)
+    assert count == 1
+    call_args = mock_conn.executemany.call_args
+    rows = call_args[0][1]
+    # embedding 参数应为 None
+    assert rows[0][-1] is None
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ async def fetch_items_concurrent(item_ids: list[int], concurrency: int = 20) -> 
 
 async def fetch_hackernews(since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
     """主函数：获取 top stories → 并发取详情 → 过滤 → 映射"""
-    ids = await get_top_stories(100)
+    ids = await get_top_stories(300)
     if not ids:
         return []
 
@@ -97,3 +97,8 @@ def _parse_hn_time(ts: int | None) -> datetime:
         return datetime.fromtimestamp(int(ts), tz=timezone.utc)
     except (ValueError, OverflowError, OSError):
         return datetime.now(timezone.utc)
+
+
+async def fetch(pool, since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
+    """标准 scraper 接口"""
+    return await fetch_hackernews(since, batch_id)

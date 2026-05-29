@@ -107,7 +107,9 @@ body {
 }
 
 /* Full-width sections */
-.runs-section {
+.runs-section,
+.videos-section,
+.users-section {
   grid-column: 1 / -1;
 }
 
@@ -146,7 +148,7 @@ body {
 /* ---------- Module Status Cards ---------- */
 .module-cards {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
 }
 
@@ -282,6 +284,8 @@ body {
 .btn-morning:hover:not(:disabled) { background: #d97706; }
 .btn-evening  { background: #6366f1; }
 .btn-evening:hover:not(:disabled) { background: #4f46e5; }
+.btn-video   { background: #8b5cf6; }
+.btn-video:hover:not(:disabled)  { background: #7c3aed; }
 
 .btn-retry {
   background: var(--red);
@@ -533,6 +537,83 @@ body {
   padding: 24px;
 }
 
+/* ---------- User Stats & Videos ---------- */
+.user-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.user-stat-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.user-stat-card .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.user-stat-card .stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.user-stats-detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.detail-block h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-chip {
+  background: var(--blue-bg);
+  color: var(--blue);
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.stat-chip {
+  background: var(--gray-bg);
+  color: var(--text);
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.stat-chip.badge-done    { background: var(--green-bg); color: var(--green); }
+.stat-chip.badge-failed  { background: var(--red-bg); color: var(--red); }
+.stat-chip.badge-pending { background: var(--yellow-bg); color: var(--yellow); }
+
+.action-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.empty-hint {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .main-grid {
@@ -541,6 +622,9 @@ body {
   }
   .module-cards {
     grid-template-columns: repeat(3, 1fr);
+  }
+  .user-stats-detail {
+    grid-template-columns: 1fr;
   }
   .cards-row, .schedule-content {
     grid-template-columns: 1fr;

@@ -276,3 +276,13 @@ async def _get_user_top_tags(
         return {}
 
     return {t: c / total for t, c in tag_counts.items()}
+
+
+# ---------------------------------------------------------------------------
+# Cold-start fallback — used when a user has no tags yet
+# ---------------------------------------------------------------------------
+DEFAULT_USER_TAGS = ["AI", "LLM", "开源"]
+
+DEFAULT_PREFERENCES = {
+    "tags": DEFAULT_USER_TAGS,
+}

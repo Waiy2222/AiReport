@@ -88,7 +88,7 @@ async def health():
 
 @app.post("/generate", response_model=GenerateResponse)
 async def generate(req: GenerateRequest):
-    """Kick off video generation (async, returns immediately)."""
+    """Kick off video generation (launches background task, returns immediately)."""
     if pipeline is None:
         raise HTTPException(503, "video pipeline not ready")
 
@@ -109,7 +109,7 @@ async def generate(req: GenerateRequest):
     return GenerateResponse(
         video_id=vid["id"],
         status=vid["status"],
-        message="video generation started — poll /status/{id} for updates",
+        message=f"video generation {vid['status']} — poll /status/{video_id} for updates",
     )
 
 

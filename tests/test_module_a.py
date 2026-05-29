@@ -20,6 +20,9 @@ app = _mod.app
 _get_pool_or_503 = _mod._get_pool_or_503
 _fetch_source = _mod._fetch_source
 
+for _stale in ['pipeline', 'db', 'models', 'config']:
+    sys.modules.pop(_stale, None)
+
 # Also make scrapers importable (already on path above)
 
 client = TestClient(app)

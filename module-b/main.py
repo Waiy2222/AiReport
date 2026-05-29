@@ -11,6 +11,13 @@ from db import get_pool, init_db, close_db
 from pipeline import run_pipeline
 from ai.render_longimage import render_longimage
 
+def _get_pool_or_503():
+    try:
+        return get_pool()
+    except RuntimeError:
+        raise HTTPException(503, "database not initialized")
+
+
 app = FastAPI(title="Module B - AI Content Processor")
 
 
@@ -51,7 +58,7 @@ async def run_b(req: ProcessRequest):
     briefing_date = date.fromisoformat(req.date)
     batch_id = uuid.UUID(req.batch_id)
 
-    pool = get_pool()
+    pool = _get_pool_or_503()
     result = await run_pipeline(pool, req.type, str(briefing_date), batch_id)
 
     return {

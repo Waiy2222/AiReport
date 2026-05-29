@@ -20,6 +20,9 @@ briefing_to_title = _mod.briefing_to_title
 briefing_to_markdown = _mod.briefing_to_markdown
 extract_tags_from_briefing = _mod.extract_tags_from_briefing
 
+for _stale in ['pipeline', 'db', 'models', 'config']:
+    sys.modules.pop(_stale, None)
+
 client = TestClient(app)
 
 
@@ -102,11 +105,13 @@ def test_platform_modules_importable():
 
 @pytest.mark.asyncio
 async def test_publish_to_returns_pending_without_credentials():
-    from module_d_main import _publish_to, _credentials_configured
-    for var in ["ZHIHU_CLIENT_ID", "ZHIHU_CLIENT_SECRET"]:
-        os.environ.pop(var, None)
+    """无凭据时平台 publish 返回 pending 状态"""
+    from platforms import zhihu
     pool = AsyncMock()
-    briefing = {"id": uuid.uuid4(), "type": "morning", "date": "2026-05-24",
+    briefing_id = uuid.uuid4()
+    briefing = {"id": briefing_id, "type": "morning", "date": "2026-05-24",
                 "tl_dr": [], "sections": [], "key_takeaways": []}
-    result = await _publish_to(pool, briefing, "zhihu")
-    assert result["status"] == "pending"
+    with patch.object(zhihu, "ZHIHU_CLIENT_ID", ""), \
+         patch.object(zhihu, "ZHIHU_CLIENT_SECRET", ""):
+        result = await zhihu.publish(pool, briefing_id, briefing)
+        assert result["status"] == "pending"

@@ -1,5 +1,6 @@
-"""Module D — 多平台发布 (:8004)"""
+"""Module D — 多平台发布 + 长图生成 (:8004)"""
 import json
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -8,15 +9,20 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
 from db import get_pool, init_db, close_db
 from platforms import zhihu, csdn, weixin
 
-app = FastAPI(title="Module D - Multi-Platform Publisher")
+app = FastAPI(title="Module D - Multi-Platform Publisher + Long Image")
 
 PLATFORMS = ["zhihu", "csdn", "weixin_oa"]
 
 # asyncpg 将 JSONB 列返回为 Python 字符串，需手动解析
 _JSONB_FIELDS = {"tl_dr", "sections", "key_takeaways", "raw_stats"}
+
+# Phase 2: 长图输出目录
+OUTPUT_DIR = Path(__file__).parent / "output"
 
 
 def _parse_briefing(row) -> dict:
@@ -38,6 +44,8 @@ async def startup():
         await init_db()
     except Exception:
         pass
+    # Phase 2: 确保 longimage 输出目录存在
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.on_event("shutdown")
@@ -179,7 +187,10 @@ def _credentials_configured(platform: str) -> bool:
 
 @app.post("/publish")
 async def publish(req: PublishRequest):
-    briefing_id = uuid.UUID(req.briefing_id)
+    try:
+        briefing_id = uuid.UUID(req.briefing_id)
+    except ValueError:
+        raise HTTPException(400, f"invalid briefing_id format: {req.briefing_id}")
 
     for p in req.platforms:
         if p not in PLATFORMS:
@@ -195,12 +206,31 @@ async def publish(req: PublishRequest):
         raise HTTPException(404, "briefing not found")
     briefing = _parse_briefing(row)
 
-    # 通过 orchestrator 并发发布
-    from orchestrator import publish_all
-    results = await publish_all(pool, briefing_id, briefing, req.platforms)
+    # Phase 2: 长图生成（dry_run + 真实发布都生成）
+    longimage_path = None
+    try:
+        from long_image import generate_long_image
+        output_name = f"longimage_{str(briefing_id)[:8]}.png"
+        output_path = str(OUTPUT_DIR / output_name)
+        longimage_path = await generate_long_image(briefing, output_path)
+    except Exception as e:
+        logger.warning(f"Long image generation failed (non-blocking): {e}")
 
-    return {
+    # 通过 orchestrator 并发发布（仅非 dry_run 时）
+    if req.dry_run:
+        results = [
+            {"platform": p, "status": "dry_run", "url": None, "error": None}
+            for p in req.platforms
+        ]
+    else:
+        from orchestrator import publish_all
+        results = await publish_all(pool, briefing_id, briefing, req.platforms)
+
+    response = {
         "briefing_id": str(briefing_id),
         "dry_run": req.dry_run,
-        "results": final_results,
+        "results": results,
     }
+    if longimage_path:
+        response["longimage"] = longimage_path
+    return response

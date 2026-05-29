@@ -49,4 +49,25 @@ module.exports = {
   unsubscribe(openid) {
     return request("/api/unsubscribe", "POST", { openid });
   },
+
+  // Phase 2 新增接口
+  getTags() {
+    return request("/api/tags");
+  },
+
+  getPreferences(openid) {
+    return request(`/api/user/preferences?openid=${encodeURIComponent(openid)}`);
+  },
+
+  setPreferences(openid, tags) {
+    return request("/api/user/preferences", "POST", { openid, tags });
+  },
+
+  getUserProfile(openid) {
+    return request(`/api/user/${encodeURIComponent(openid)}/profile`);
+  },
+
+  reportBehavior(data) {
+    return request("/api/behavior", "POST", data);
+  },
 };

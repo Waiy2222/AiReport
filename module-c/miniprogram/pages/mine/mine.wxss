@@ -82,3 +82,75 @@
   color: #ccc;
   margin-left: 10px;
 }
+
+/* Phase 2: 标签偏好样式 */
+.tag-section {
+  padding: 10px 16px 16px;
+}
+
+.tag-hint {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 12px;
+}
+
+.tag-hint.selected {
+  color: #07c160;
+}
+
+.tag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 8px 14px;
+  border-radius: 18px;
+  border: 1.5px solid #e5e5e5;
+  background: #fafafa;
+  transition: all 0.15s;
+}
+
+.tag-chip.selected {
+  background: #07c160;
+  border-color: #07c160;
+}
+
+.tag-label {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.tag-chip.selected .tag-label {
+  color: #fff;
+}
+
+.tag-desc {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+.tag-chip.selected .tag-desc {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.save-btn {
+  background: #07c160;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 10px 0;
+  border: none;
+  line-height: 1.5;
+}
+
+.save-btn::after {
+  border: none;
+}

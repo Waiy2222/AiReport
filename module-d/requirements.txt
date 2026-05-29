@@ -5,3 +5,5 @@ httpx==0.28.1
 pydantic==2.10.4
 Pillow==11.1.0
 qrcode==7.4.2
+playwright>=1.40
+# playwright install chromium  # run after pip install

@@ -62,17 +62,43 @@ _C_BORDER_GREEN = "#dcefe4"
 _C_LIGHT_BORDER = "#e4f3e9"
 
 
+def _image_html(image_url: str) -> str:
+    """Phase 2: 渲染图片 HTML，加载失败时不破坏布局"""
+    if not image_url:
+        return ""
+    return (
+        f'<div style="margin:12px 0 0;border-radius:8px;overflow:hidden;'
+        f'background:#f0f0f0;line-height:0;">'
+        f'<img src="{_escape_html(image_url)}" alt="" style="width:100%;'
+        f'display:block;" '
+        f'onerror="this.style.display=\'none\';'
+        f'this.parentElement.style.display=\'none\'" />'
+        f'</div>'
+    )
+
+
 def render_briefing_html(briefing) -> str:
     """Render a briefing dict into WeChat-compatible styled HTML.
 
     briefing fields used: type, date, tl_dr, sections, key_takeaways.
-    Each section item uses: title, summary, score, source, url.
+    Each section item uses: title, summary, score, source, url, image_url, tags.
+    Phase 2: 新增 headline 头条区 + 每条 item 配图 + tags 标签显示
     """
     type_label = "AI资讯早报" if briefing["type"] == "morning" else "AI资讯晚报"
     date_str = _escape_html(str(briefing["date"]))
     tl_dr = briefing.get("tl_dr") or []
     sections = briefing.get("sections") or []
     takeaways = briefing.get("key_takeaways") or []
+
+    # Phase 2: 提取头条（sections 中 score 最高的 item）
+    headline_item = None
+    all_items = []
+    for sec in sections:
+        for item in sec.get("items", []):
+            all_items.append(item)
+    if all_items:
+        all_items.sort(key=lambda x: x.get("score", 0) or 0, reverse=True)
+        headline_item = all_items[0]
 
     parts: list[str] = []
 
@@ -94,6 +120,44 @@ def render_briefing_html(briefing) -> str:
         f'{type_label} | {date_str}</p>'
         f'</section>'
     )
+
+    # ── Phase 2: Headline（头条大图区） ──────────────────────────────
+    if headline_item:
+        hl_title = _escape_html(headline_item.get("title", ""))
+        hl_summary = _escape_html(headline_item.get("summary", ""))
+        hl_url = _escape_html(headline_item.get("url", ""))
+        hl_image = headline_item.get("image_url", "")
+
+        hl_parts = [
+            f'<section style="margin:0 0 28px;border-radius:14px;'
+            f'overflow:hidden;border:1px solid {_C_BORDER_GREEN};">'
+        ]
+        # 头条大图
+        if hl_image:
+            hl_parts.append(
+                f'<div style="line-height:0;background:#e8e8e8;">'
+                f'<img src="{hl_image}" alt="" style="width:100%;display:block;" '
+                f'onerror="this.style.display=\'none\'" />'
+                f'</div>'
+            )
+        # 头条文字
+        hl_parts.append(
+            f'<div style="padding:18px 16px;background:#fff;">'
+            f'<div style="display:inline-block;background:{_C_GREEN};color:#fff;'
+            f'font-size:11px;font-weight:700;padding:2px 10px;border-radius:10px;'
+            f'margin-bottom:10px;">头条</div>'
+            f'<h2 style="margin:0 0 8px;color:{_C_DARK};font-size:20px;'
+            f'font-weight:800;line-height:1.4;">{hl_title}</h2>'
+            f'<p style="margin:0;color:#555;font-size:14px;line-height:1.8;">{hl_summary}</p>'
+        )
+        if hl_url:
+            hl_parts.append(
+                f'<p style="margin:10px 0 0;"><a href="{hl_url}" '
+                f'style="color:{_C_GREEN};text-decoration:none;font-size:14px;">'
+                f'阅读原文 &rarr;</a></p>'
+            )
+        hl_parts.append("</div></section>")
+        parts.append("\n".join(hl_parts))
 
     # ── TL;DR — table-of-contents style list ───────────────────────────
     if tl_dr:
@@ -121,7 +185,7 @@ def render_briefing_html(briefing) -> str:
             )
         parts.append("</section>")
 
-    # ── Section / item body ────────────────────────────────────────────
+    # ── Section / item body（Phase 2: 带图片 + 标签） ─────────────────
     for section in sections:
         sec_title = _escape_html(section.get("title", ""))
         if sec_title:
@@ -140,6 +204,8 @@ def render_briefing_html(briefing) -> str:
             source = _escape_html(item.get("source", ""))
             url = _escape_html(item.get("url", ""))
             score = item.get("score", 0)
+            tags = item.get("tags", [])
+            image_url = item.get("image_url", "")
 
             # Item header
             parts.append(
@@ -178,6 +244,21 @@ def render_briefing_html(briefing) -> str:
                     f'<p style="margin:16px 0 0;color:#555;font-size:15px;'
                     f'line-height:1.9;text-align:left;">{summary}</p>'
                 )
+
+            # Phase 2: 图片
+            parts.append(_image_html(image_url))
+
+            # Phase 2: 标签
+            if tags:
+                tag_html = "".join(
+                    f'<span style="display:inline-block;background:#eef4ff;'
+                    f'color:#2d6cc9;font-size:12px;padding:1px 10px;'
+                    f'border-radius:10px;margin-right:4px;'
+                    f'margin-top:8px;">{_escape_html(t)}</span>'
+                    for t in tags[:4]
+                )
+                parts.append(f'<div style="margin-top:4px;">{tag_html}</div>')
+
             if url:
                 parts.append(
                     f'<p style="margin:12px 0 0;">'

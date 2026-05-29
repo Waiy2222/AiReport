@@ -50,14 +50,14 @@ def test_run_returns_503_without_db():
 
 
 # ── _fetch_source dispatch ───────────────────────────────────────────────
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_fetch_source_unknown_source():
     pool = AsyncMock()
     count = await _fetch_source(pool, "nonexistent", datetime.now(timezone.utc), uuid.uuid4())
     assert count == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_fetch_source_handles_exception():
     pool = AsyncMock()
     since = datetime.now(timezone.utc) - timedelta(hours=12)
@@ -71,7 +71,7 @@ async def test_fetch_source_handles_exception():
 
 
 # ── Scraper insertion helper ─────────────────────────────────────────────
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_insert_items_skips_duplicates(mock_pool):
     from scrapers import _insert_items
 
@@ -91,7 +91,7 @@ async def test_insert_items_skips_duplicates(mock_pool):
     assert count == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_insert_items_counts_inserted(mock_pool):
     from scrapers import _insert_items
 
@@ -111,7 +111,7 @@ async def test_insert_items_counts_inserted(mock_pool):
 
 
 # ── GitHub scraper (basic) ────────────────────────────────────────────────
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_github_scraper_non_200():
     from scrapers.github import fetch
 
@@ -124,13 +124,13 @@ async def test_github_scraper_non_200():
 
     with patch("scrapers.github.httpx.AsyncClient") as mock_http:
         mock_http.return_value.__aenter__.return_value = mock_client
-        count = await fetch(pool, datetime.now(timezone.utc) - timedelta(hours=24), uuid.uuid4())
+        items = await fetch(pool, datetime.now(timezone.utc) - timedelta(hours=24), uuid.uuid4())
 
-    assert count == 0
+    assert len(items) == 0
 
 
 # ── Reddit scraper header ─────────────────────────────────────────────────
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_reddit_scraper_sets_user_agent():
     from scrapers.reddit import fetch
 

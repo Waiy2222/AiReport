@@ -93,3 +93,8 @@ def _parse_reddit_time(ts: float | None) -> datetime:
         return datetime.fromtimestamp(float(ts), tz=timezone.utc)
     except (ValueError, OverflowError, OSError):
         return datetime.now(timezone.utc)
+
+
+async def fetch(pool, since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
+    """标准 scraper 接口"""
+    return await fetch_reddit(since, batch_id)

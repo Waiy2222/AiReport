@@ -115,3 +115,8 @@ def _clean_html(text: str) -> str:
     clean = re.sub(r"<[^>]+>", "", text)
     clean = re.sub(r"\s+", " ", clean)
     return clean.strip()
+
+
+async def fetch(pool, since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
+    """标准 scraper 接口"""
+    return await fetch_rss(since, batch_id)

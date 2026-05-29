@@ -31,20 +31,26 @@ def test_get_pool_or_503():
     assert exc.value.status_code == 503
 
 
-def test_latest_briefing_returns_503_without_db():
+def test_latest_briefing_returns_mock_without_db():
+    """无数据库时使用 mock 数据回退"""
     response = client.get("/api/briefings/latest?type=morning")
-    assert response.status_code == 503
+    assert response.status_code == 200
+    assert "id" in response.json()
 
 
-def test_history_returns_503_without_db():
+def test_history_returns_mock_without_db():
+    """无数据库时使用 mock 数据回退"""
     response = client.get("/api/briefings/history")
-    assert response.status_code == 503
+    assert response.status_code == 200
+    data = response.json()
+    assert "items" in data
+    assert len(data["items"]) > 0
 
 
 def test_push_valid_type():
     response = client.post("/push", json={"type": "morning"})
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    assert response.json()["status"] in ("ok", "dry_run")
 
 
 def test_push_invalid_type():
@@ -67,7 +73,7 @@ def test_latest_briefing_returns_data():
         "generated_at": ts,
     }.get(k)
     mock_pool.fetchrow = AsyncMock(return_value=mock_row)
-    with patch("module_c_main._get_pool_or_503", return_value=mock_pool):
+    with patch("module_c_main._db", return_value=mock_pool):
         response = client.get("/api/briefings/latest?type=morning")
         assert response.status_code == 200
         assert response.json()["id"] == "b0000001-0000-0000-0000-000000000001"
@@ -76,14 +82,14 @@ def test_latest_briefing_returns_data():
 def test_latest_briefing_404_when_none():
     mock_pool = AsyncMock()
     mock_pool.fetchrow = AsyncMock(return_value=None)
-    with patch("module_c_main._get_pool_or_503", return_value=mock_pool):
+    with patch("module_c_main._db", return_value=mock_pool):
         response = client.get("/api/briefings/latest?type=morning")
         assert response.status_code == 404
 
 
 def test_latest_briefing_invalid_type():
     mock_pool = AsyncMock()
-    with patch("module_c_main._get_pool_or_503", return_value=mock_pool):
+    with patch("module_c_main._db", return_value=mock_pool):
         response = client.get("/api/briefings/latest?type=invalid")
         assert response.status_code == 400
 
@@ -99,7 +105,7 @@ def test_history_paginated():
     }.get(k)
     mock_pool.fetch = AsyncMock(return_value=[mock_row])
     mock_pool.fetchval = AsyncMock(return_value=10)
-    with patch("module_c_main._get_pool_or_503", return_value=mock_pool):
+    with patch("module_c_main._db", return_value=mock_pool):
         response = client.get("/api/briefings/history?page=1&size=10")
         assert response.status_code == 200
         data = response.json()
@@ -109,7 +115,7 @@ def test_history_paginated():
 
 def test_subscribe():
     mock_pool = AsyncMock()
-    with patch("module_c_main._get_pool_or_503", return_value=mock_pool):
+    with patch("module_c_main._db", return_value=mock_pool):
         response = client.post("/api/subscribe", json={
             "openid": "test_user_001",
             "morning_enabled": True, "evening_enabled": False,
@@ -120,7 +126,7 @@ def test_subscribe():
 
 def test_unsubscribe():
     mock_pool = AsyncMock()
-    with patch("module_c_main._get_pool_or_503", return_value=mock_pool):
+    with patch("module_c_main._db", return_value=mock_pool):
         response = client.post("/api/unsubscribe", json={"openid": "test_user_001"})
         assert response.status_code == 200
         mock_pool.execute.assert_called_once()

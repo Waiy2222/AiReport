@@ -209,9 +209,9 @@ async def test_push_no_params(client):
 
 @pytest.mark.anyio
 async def test_push_type_not_found(client):
-    """POST /push type 不存在应返回 404"""
+    """POST /push type 无效应返回 400"""
     resp = await client.post("/push", json={"type": "afternoon"})
-    assert resp.status_code == 404
+    assert resp.status_code == 400
 
 
 @pytest.mark.anyio

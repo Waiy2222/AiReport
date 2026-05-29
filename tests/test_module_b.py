@@ -18,6 +18,9 @@ _spec.loader.exec_module(_mod)
 app = _mod.app
 _get_pool_or_503 = _mod._get_pool_or_503
 
+for _stale in ['pipeline', 'db', 'models', 'config']:
+    sys.modules.pop(_stale, None)
+
 client = TestClient(app)
 
 

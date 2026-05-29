@@ -52,6 +52,13 @@ def _db():
     return get_pool()
 
 
+def _get_pool_or_503():
+    try:
+        return _db()
+    except RuntimeError:
+        raise HTTPException(503, "database not initialized")
+
+
 # 静态文件服务（H5 页面）
 _h5_dir = os.path.join(os.path.dirname(__file__), "..", "h5")
 if os.path.isdir(_h5_dir):
@@ -295,6 +302,8 @@ async def push(req: PushRequest):
                 raise HTTPException(404, "briefing not found")
 
     elif req.type:
+        if req.type not in ("morning", "evening"):
+            raise HTTPException(400, "type must be morning or evening")
         # 按 type 取最新简报
         try:
             pool = _db()

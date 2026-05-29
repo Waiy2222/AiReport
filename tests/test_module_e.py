@@ -18,6 +18,10 @@ _spec.loader.exec_module(_mod)
 app = _mod.app
 scheduled_trigger = _mod.scheduled_trigger
 
+# Clear cached modules that may have been polluted by other test files
+for _stale in ['pipeline', 'db', 'models', 'config']:
+    sys.modules.pop(_stale, None)
+
 client = TestClient(app)
 
 

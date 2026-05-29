@@ -114,3 +114,13 @@ SELECT
 FROM briefings b
 WHERE b.date >= CURRENT_DATE - INTERVAL '3 days'
 LIMIT 3;
+
+-- ============================================================
+-- Part 3: raw_items 补充 embedding 假向量（用于 RAG 检索测试）
+-- ============================================================
+UPDATE raw_items
+SET embedding = (
+    SELECT array_agg(random() * 2 - 1)
+    FROM generate_series(1, 1536)
+)::vector
+WHERE embedding IS NULL;

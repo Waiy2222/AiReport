@@ -101,10 +101,12 @@ services:
       - "8006:8006"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      BAILIAN_API_KEY: ${BAILIAN_API_KEY:-}
+      BAILIAN_BASE_URL: ${BAILIAN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      BAILIAN_MODEL: ${BAILIAN_MODEL:-qwen-vl-max}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
-      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
       VIDEO_OUTPUT_DIR: /app/output
       VIDEO_DOWNLOAD_DIR: /app/downloads
     volumes:

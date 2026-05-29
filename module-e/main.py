@@ -12,7 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from db import get_pool, init_db, close_db
-from pipeline import execute_pipeline
+from pipeline import execute_pipeline, execute_video_pipeline
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [E] %(message)s")
 logger = logging.getLogger(__name__)
@@ -124,6 +124,28 @@ async def trigger(type: str = Query(..., description="morning or evening")):
         raise HTTPException(500, f"pipeline failed: {e}")
 
 
+# ---------- 手动触发视频生成 ----------
+@app.post("/admin/trigger-video")
+async def trigger_video(
+    type: str = Query("ai_agent_weekly", description="video type"),
+    gen_date: str = Query(None, description="date in YYYY-MM-DD format"),
+):
+    """Manually trigger Module F video generation (independent of doc pipeline)."""
+    try:
+        pool = get_pool()
+        await pool.fetchval("SELECT 1")
+    except RuntimeError:
+        raise HTTPException(503, "database not initialized")
+    except Exception:
+        raise HTTPException(503, "database not available")
+
+    try:
+        result = await execute_video_pipeline(type, gen_date)
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"video pipeline failed: {e}")
+
+
 # ---------- 运行总览 ----------
 @app.get("/admin/overview")
 async def overview():
@@ -150,7 +172,7 @@ async def overview():
 
     # 各模块最新状态
     module_status = {}
-    for m in ["A", "B", "C", "D", "E"]:
+    for m in ["A", "B", "C", "D", "E", "F"]:
         row = await pool.fetchrow(
             "SELECT status FROM run_log WHERE module=$1 ORDER BY started_at DESC LIMIT 1", m
         )
@@ -160,6 +182,14 @@ async def overview():
     total_runs = await pool.fetchval("SELECT COUNT(*) FROM run_log")
     success_runs = await pool.fetchval("SELECT COUNT(*) FROM run_log WHERE status='success'")
     failed_runs = await pool.fetchval("SELECT COUNT(*) FROM run_log WHERE status='failed'")
+
+    # 视频统计
+    video_total = await pool.fetchval("SELECT COUNT(*) FROM videos")
+    video_done = await pool.fetchval("SELECT COUNT(*) FROM videos WHERE status='done'")
+    video_recent = await pool.fetch(
+        """SELECT id, title, status, duration_seconds, created_at
+           FROM videos ORDER BY created_at DESC LIMIT 5"""
+    )
 
     return {
         "date": today.isoformat(),
@@ -191,6 +221,20 @@ async def overview():
             }
             for r in recent
         ],
+        "videos": {
+            "total": video_total,
+            "done": video_done,
+            "recent": [
+                {
+                    "id": str(v["id"]),
+                    "title": v["title"],
+                    "status": v["status"],
+                    "duration_seconds": v["duration_seconds"],
+                    "created_at": v["created_at"].isoformat() if v["created_at"] else None,
+                }
+                for v in video_recent
+            ],
+        },
     }
 
 

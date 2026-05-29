@@ -44,21 +44,27 @@ async function apiPost(path, body = null) {
 // ---------- Load all data ----------
 async function loadAll() {
   try {
-    const [overview, schedule, stats, healthAll] = await Promise.allSettled([
+    const [overview, schedule, stats, healthAll, userStats, videos] = await Promise.allSettled([
       apiGet("/admin/overview"),
       apiGet("/admin/schedule"),
       apiGet("/api/dashboard/stats"),
       apiGet("/api/dashboard/health/all"),
+      apiGet("/api/dashboard/users/stats"),
+      apiGet("/api/dashboard/videos"),
     ]);
     const ov   = overview.status   === "fulfilled" ? overview.value   : null;
     const sch  = schedule.status   === "fulfilled" ? schedule.value   : null;
     const st   = stats.status      === "fulfilled" ? stats.value      : null;
     const hAll = healthAll.status  === "fulfilled" ? healthAll.value  : null;
+    const us   = userStats.status  === "fulfilled" ? userStats.value  : null;
+    const vs   = videos.status     === "fulfilled" ? videos.value     : null;
 
     if (ov)  renderOverview(ov);
     if (sch) { scheduleData = sch; renderSchedule(sch); }
     if (st)  renderStats(st);
     if (hAll) renderModuleHealth(hAll, ov?.modules);
+    if (us)  renderUserStats(us);
+    if (vs)  renderVideos(vs);
     if (!ov && !sch && !st && !hAll) showToast("error", "无法连接后端，请确认服务运行在 " + API_BASE);
   } catch (e) {
     console.error("loadAll error:", e);
@@ -80,13 +86,13 @@ function startClock() {
 // ---------- Render Module Health ----------
 function renderModuleHealth(healthAll, overviewModules) {
   const container = document.getElementById("moduleCards");
-  const map = { A: "资讯抓取", B: "AI加工", C: "推送", D: "发布", E: "调度" };
+  const map = { A: "资讯抓取", B: "AI加工", C: "推送", D: "发布", E: "调度", F: "视频生成" };
 
   const overviewStatus = overviewModules || {};
   const healthModules = healthAll?.modules || {};
 
   let html = "";
-  for (const m of ["A", "B", "C", "D", "E"]) {
+  for (const m of ["A", "B", "C", "D", "E", "F"]) {
     const runStatus = overviewStatus[m] || healthModules[m]?.status || "unknown";
     const lastRun = healthModules[m]?.last_run || null;
     const cls = statusClass(runStatus);
@@ -165,6 +171,123 @@ async function triggerPipeline(type) {
     btn.disabled = false;
     btn.textContent = originalText;
   }
+}
+
+async function triggerVideoPipeline() {
+  const btn = document.getElementById("triggerVideo");
+  const fb = document.getElementById("triggerFeedback");
+  const originalText = btn.textContent;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成中...';
+  fb.innerHTML = "";
+  fb.className = "trigger-feedback";
+
+  try {
+    const result = await apiPost("/admin/trigger-video?type=ai_agent_weekly");
+    fb.innerHTML = `视频生成已触发: video_id=${result.video_id}, status=${result.status}`;
+    fb.className = "trigger-feedback success";
+    showToast("success", "视频生成触发成功");
+    setTimeout(loadAll, 5000);
+  } catch (e) {
+    fb.innerHTML = `触发失败: ${e.message}`;
+    fb.className = "trigger-feedback error";
+    showToast("error", `视频触发失败: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// ---------- Render User Stats ----------
+function renderUserStats(us) {
+  const container = document.getElementById("userStatsContent");
+  const au = us.active_users || {};
+  const tags = us.tag_distribution || {};
+  const actions = us.recent_actions || {};
+
+  const tagItems = Object.entries(tags)
+    .sort((a, b) => b[1] - a[1])
+    .map(([tag, count]) => `<span class="tag-chip">${tag} <strong>${count}</strong></span>`)
+    .join("");
+
+  const actionItems = Object.entries(actions)
+    .map(([action, count]) => `<span class="stat-chip">${action}: ${count}</span>`)
+    .join("");
+
+  container.innerHTML = `
+    <div class="user-stats-row">
+      <div class="user-stat-card">
+        <div class="stat-value">${au.last_7_days ?? 0}</div>
+        <div class="stat-label">7日活跃</div>
+      </div>
+      <div class="user-stat-card">
+        <div class="stat-value">${au.last_30_days ?? 0}</div>
+        <div class="stat-label">30日活跃</div>
+      </div>
+      <div class="user-stat-card">
+        <div class="stat-value">${us.total_subscribed ?? 0}</div>
+        <div class="stat-label">订阅用户</div>
+      </div>
+    </div>
+    <div class="user-stats-detail">
+      <div class="detail-block">
+        <h4>标签分布</h4>
+        <div class="tag-cloud">${tagItems || '<span class="empty-hint">暂无数据</span>'}</div>
+      </div>
+      <div class="detail-block">
+        <h4>近7日行为</h4>
+        <div class="action-chips">${actionItems || '<span class="empty-hint">暂无数据</span>'}</div>
+      </div>
+    </div>`;
+}
+
+// ---------- Render Videos ----------
+function renderVideos(vs) {
+  const container = document.getElementById("videosContent");
+  const videos = vs.videos || [];
+  const byStatus = vs.by_status || {};
+
+  const statusChips = Object.entries(byStatus)
+    .map(([status, count]) => `<span class="stat-chip badge-${statusBadge(status)}">${statusLabel(status)}: ${count}</span>`)
+    .join("");
+
+  const rows = videos.map((v) => `
+    <tr>
+      <td title="${v.id}">${v.id?.slice(0, 8) ?? "—"}...</td>
+      <td>${v.type || "—"}</td>
+      <td>${v.title || "—"}</td>
+      <td><span class="badge badge-${statusBadge(v.status)}">${statusLabel(v.status)}</span></td>
+      <td>${v.duration_seconds ? v.duration_seconds + "s" : "—"}</td>
+      <td>${v.created_at ? formatTime(v.created_at) : "—"}</td>
+    </tr>
+  `).join("");
+
+  container.innerHTML = `
+    <div class="user-stats-row">
+      <div class="user-stat-card">
+        <div class="stat-value">${vs.total ?? 0}</div>
+        <div class="stat-label">视频总数</div>
+      </div>
+      <div class="user-stat-card" style="flex:2">
+        <div class="action-chips">${statusChips || '<span class="empty-hint">暂无</span>'}</div>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table class="runs-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>类型</th>
+            <th>标题</th>
+            <th>状态</th>
+            <th>时长</th>
+            <th>创建时间</th>
+          </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="6" class="loading-placeholder">暂无视频记录</td></tr>'}</tbody>
+      </table>
+    </div>`;
 }
 
 // ---------- Render Stats ----------

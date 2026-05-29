@@ -25,6 +25,7 @@ MODULE_HEALTH_URLS = {
     "B": "http://module-b:8002/health",
     "C": "http://module-c:8003/health",
     "D": "http://module-d:8004/health",
+    "F": "http://module-f:8006/health",
 }
 
 
@@ -46,7 +47,7 @@ async def dashboard_stats():
 
     # -- success / failed by module --
     module_stats = {}
-    for m in ["A", "B", "C", "D"]:
+    for m in ["A", "B", "C", "D", "F"]:
         total = await pool.fetchval(
             "SELECT COUNT(*) FROM run_log WHERE module=$1", m)
         ok = await pool.fetchval(
@@ -240,7 +241,7 @@ async def health_all():
     pool = _get_pool_or_503()
 
     modules = {}
-    for m in ["A", "B", "C", "D", "E"]:
+    for m in ["A", "B", "C", "D", "E", "F"]:
         row = await pool.fetchrow(
             "SELECT status, started_at FROM run_log WHERE module=$1 "
             "ORDER BY started_at DESC LIMIT 1",
@@ -275,4 +276,104 @@ async def health_all():
         "modules": modules,
         "db": db_status,
         "timestamp": datetime.now().isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
+#  User behavior stats
+# ---------------------------------------------------------------------------
+@router.get("/users/stats")
+async def user_behavior_stats():
+    """Aggregate user behavior: tag distribution, active users, recent activity."""
+    pool = _get_pool_or_503()
+
+    # Active users (any behavior in last 7 days)
+    active_7d = await pool.fetchval(
+        """SELECT COUNT(DISTINCT user_openid) FROM user_behavior
+           WHERE created_at > NOW() - INTERVAL '7 days'""")
+
+    # Active users (last 30 days)
+    active_30d = await pool.fetchval(
+        """SELECT COUNT(DISTINCT user_openid) FROM user_behavior
+           WHERE created_at > NOW() - INTERVAL '30 days'""")
+
+    # Total users with subscriptions
+    total_subscribed = await pool.fetchval(
+        "SELECT COUNT(*) FROM subscriptions")
+
+    # Tag distribution — from subscriptions.preferences
+    tag_rows = await pool.fetch(
+        "SELECT preferences FROM subscriptions WHERE preferences IS NOT NULL")
+    tag_counts: dict[str, int] = {}
+    for r in tag_rows:
+        prefs = r["preferences"]
+        if isinstance(prefs, str):
+            prefs = json.loads(prefs)
+        tags = prefs.get("tags", []) if isinstance(prefs, dict) else []
+        for t in tags:
+            tag_counts[t] = tag_counts.get(t, 0) + 1
+
+    # Top actions in last 7 days
+    action_counts = {}
+    action_rows = await pool.fetch(
+        """SELECT action, COUNT(*) AS cnt FROM user_behavior
+           WHERE created_at > NOW() - INTERVAL '7 days'
+           GROUP BY action""")
+    for r in action_rows:
+        action_counts[r["action"]] = r["cnt"]
+
+    return {
+        "active_users": {
+            "last_7_days": active_7d,
+            "last_30_days": active_30d,
+        },
+        "total_subscribed": total_subscribed,
+        "tag_distribution": tag_counts,
+        "recent_actions": action_counts,
+    }
+
+
+# ---------------------------------------------------------------------------
+#  Video status panel
+# ---------------------------------------------------------------------------
+@router.get("/videos")
+async def video_panel(limit: int = Query(10, ge=1, le=50)):
+    """Recent videos list with status, duration, and paths."""
+    pool = _get_pool_or_503()
+
+    total = await pool.fetchval("SELECT COUNT(*) FROM videos")
+    rows = await pool.fetch(
+        """SELECT id, type, date, title, status, output_path,
+                  duration_seconds, metadata, created_at
+           FROM videos ORDER BY created_at DESC LIMIT $1""",
+        limit,
+    )
+
+    videos = []
+    for r in rows:
+        meta = r["metadata"]
+        if isinstance(meta, str):
+            meta = json.loads(meta)
+        videos.append({
+            "id": str(r["id"]),
+            "type": r["type"],
+            "date": r["date"].isoformat() if r["date"] else None,
+            "title": r["title"],
+            "status": r["status"],
+            "output_path": r["output_path"],
+            "duration_seconds": r["duration_seconds"],
+            "metadata": meta,
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        })
+
+    by_status = {}
+    status_rows = await pool.fetch(
+        "SELECT status, COUNT(*) AS cnt FROM videos GROUP BY status")
+    for r in status_rows:
+        by_status[r["status"]] = r["cnt"]
+
+    return {
+        "total": total,
+        "by_status": by_status,
+        "videos": videos,
     }

@@ -45,8 +45,8 @@ async def health():
         return {"status": "ok", "db": "disconnected"}
 
 
-@app.post("/run")
-async def run(req: ProcessRequest):
+@app.post("/run-b")
+async def run_b(req: ProcessRequest):
     if req.type not in ("morning", "evening"):
         raise HTTPException(400, "type must be morning or evening")
     briefing_date = date.fromisoformat(req.date)

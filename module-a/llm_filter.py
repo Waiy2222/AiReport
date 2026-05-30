@@ -102,26 +102,107 @@ def _extract_json(text: str) -> str:
 
 
 def _mock_score_one(item: dict) -> float:
-    """启发式评分：关键词+实体+来源加权"""
+    """启发式评分：不同领域不同评分标准，确保非AI内容也能过线"""
     combined = (item.get("title", "") + " " + item.get("content", "")).lower()
-    score = 5.0
+    source = item.get("source", "")
+    category = item.get("metadata", {}).get("category", "")
 
-    for kw in ["发布", "开源", "release", "launch", "正式", "突破",
+    # 不同领域不同起评分：AI/科技门槛高，体育/时事/国际门槛低
+    if category == "体育" or source == "espn":
+        score = 6.5  # 体育起分高，确保过线
+    elif category in ("时事", "国际") or source in ("people", "bbc_zh", "voa_zh"):
+        score = 6.5  # 时事/国际起分高
+    elif category == "科技" or source in ("github", "hackernews", "techcrunch_ai"):
+        score = 5.0  # 科技正常起分（AI关键词会加分）
+    else:
+        score = 5.0
+
+    # 通用热点词
+    for kw in ["发布", "开源", "release", "launch", "正式", "突破", "夺冠",
+               "政策", "改革", "重大", "紧急", "突发", "官宣", "首发",
                "超越", "v0.", "v1.", "v2.", "v3.", "v4.", "v5."]:
         if kw.lower() in combined:
             score += 0.5
 
+    # 领域关键词加分（每类最多加 2.0）
+    ai_bonus = 0
     for ent in ["deepseek", "openai", "gpt", "claude", "gemini", "llama",
                 "meta", "google", "anthropic", "langchain", "agent",
-                "rag", "mcp", "vllm", "chromadb", "huggingface",
-                "qwen", "通义", "文心", "百川", "chatglm"]:
-        if ent in combined:
-            score += 0.5
+                "rag", "mcp", "vllm", "huggingface", "qwen",
+                "通义", "文心", "百川", "chatglm", "字节", "华为", "小米"]:
+        if ent.lower() in combined:
+            ai_bonus += 0.5
+    score += min(ai_bonus, 2.0)
 
-    if item.get("source") in ("github", "hackernews"):
+    sports_bonus = 0
+    for ent in ["nba", "nhl", "mlb", "nfl", "欧冠", "英超", "西甲", "德甲", "意甲",
+                "世界杯", "cba", "中超", "梅西", "c罗",
+                "奥运会", "世锦赛", "总决赛", "总冠军", "季后赛", "全明星"]:
+        if ent.lower() in combined:
+            sports_bonus += 0.5
+    score += min(sports_bonus, 2.0)
+
+    news_bonus = 0
+    for ent in ["国务院", "外交部", "商务部", "央行", "政治局", "两会",
+                "拜登", "特朗普", "欧盟", "联合国"]:
+        if ent.lower() in combined:
+            news_bonus += 0.5
+    score += min(news_bonus, 2.0)
+
+    if source in ("github", "hackernews", "xinhua", "people", "cctv_news", "espn"):
         score += 0.5
 
     return round(max(1.0, min(10.0, score)), 1)
+
+
+def _mock_tags_one(item: dict) -> list[str]:
+    """启发式标签分配"""
+    combined = (item.get("title", "") + " " + item.get("content", "")).lower()
+    source = item.get("source", "")
+    category = item.get("metadata", {}).get("category", "")
+
+    tags = set()
+
+    # Category-based tag
+    if category == "科技":
+        tags.add("科技")
+    elif category == "时事":
+        tags.add("时事")
+    elif category == "国际":
+        tags.add("国际")
+    elif category == "体育":
+        tags.add("体育")
+
+    # AI/Agent keywords
+    for kw in ["deepseek", "openai", "gpt", "claude", "gemini", "llama", "qwen"]:
+        if kw in combined:
+            tags.add("LLM")
+            break
+    if "agent" in combined:
+        tags.add("Agent")
+    if any(kw in combined for kw in ["开源", "open source", "github"]):
+        tags.add("开源")
+    if any(kw in combined for kw in ["框架", "framework"]):
+        tags.add("框架")
+    if any(kw in combined for kw in ["工具", "tool", "vllm", "v0."]):
+        tags.add("工具")
+
+    # Sports keywords
+    if any(kw in combined for kw in ["nba", "nhl", "mlb", "nfl", "cba", "中超"]):
+        tags.add("体育")
+    if any(kw in combined for kw in ["欧冠", "英超", "西甲", "德甲", "意甲", "世界杯", "欧洲杯"]):
+        tags.add("体育")
+    if source == "espn":
+        tags.add("体育")
+
+    # News/Policy keywords
+    if any(kw in combined for kw in ["国务院", "外交部", "商务部", "央行", "政治局", "政策"]):
+        tags.add("政策")
+
+    if source in ("bbc_zh", "voa_zh"):
+        tags.add("国际")
+
+    return list(tags)[:5]  # max 5 tags
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +211,7 @@ def _mock_score_one(item: dict) -> float:
 
 
 def _build_filter_prompt(items: list[dict], rag_context: str) -> str:
-    """构建 LLM 筛选 prompt"""
+    """构建 LLM 筛选 prompt — AI/Agent 优先"""
     lines = []
     for idx, it in enumerate(items):
         lines.append(
@@ -145,18 +226,31 @@ def _build_filter_prompt(items: list[dict], rag_context: str) -> str:
         rag_section = f"\n参考历史案例（相似资讯）：\n{rag_context}\n"
 
     return (
-        "请对以下每条AI资讯进行相关性评估。\n\n"
-        "评分标准：\n"
-        "- 10分：重大AI突破/顶级公司重要发布/划时代开源项目\n"
-        "- 8-9分：知名公司/项目动态/重要工具发布/有影响力论文\n"
-        "- 6-7分：有价值的行业资讯/中等影响力开源项目\n"
-        "- 4-5分：一般性技术讨论/边缘相关\n"
-        "- 1-3分：与AI核心领域关联较弱\n"
+        "你是一名资深新闻编辑。请对以下每条新闻按领域分别评分：\n\n"
+        "AI/科技类评分标准：\n"
+        "- 9-10分：划时代突破/重大模型发布/顶级开源项目\n"
+        "- 7-8分：AI 行业重要动态/知名公司重大发布/重要工具\n"
+        "- 5-6分：一般科技报道/边缘 AI 相关\n"
+        "- 1-4分：低价值内容\n\n"
+        "体育类评分标准：\n"
+        "- 8-10分：顶级赛事决赛/重大转会/破纪录\n"
+        "- 6-7分：热门赛事/季后赛/知名球员动态\n"
+        "- 4-5分：一般赛事报道\n"
+        "- 1-3分：琐碎花边\n\n"
+        "时事/国际/政策类评分标准：\n"
+        "- 8-10分：重大政策发布/国际重大事件\n"
+        "- 6-7分：重要时事/政策解读\n"
+        "- 4-5分：一般性报道\n"
+        "- 1-3分：低价值内容\n\n"
+        "注意：不同领域分开评判，体育/时事类不需要AI相关性也能给高分。\n\n"
+        "标签从下列中选择（可多选；reason 用中文写）：\n"
+        "LLM, Agent, 开源, 框架, 工具, 基础设施,\n"
+        "科技, 政策, 时事, 国际, 体育, 财经\n"
         f"{rag_section}\n"
         "候选条目：\n"
         f"{joined}\n\n"
         '以JSON数组格式返回：'
-        '[{"index":0,"score":8.5,"tags":["LLM","开源"],"reason":"重要开源项目发布"}, ...]'
+        '[{"index":0,"score":8.5,"tags":["LLM","Agent"],"reason":"重要AI项目发布"}, ...]'
     )
 
 
@@ -205,21 +299,21 @@ async def _score_items(items: list[dict], rag_context: str) -> list[dict]:
     if not _has_api_key():
         for it in items:
             it["metadata"]["ai_score"] = _mock_score_one(it)
-            it["metadata"]["tags"] = []
+            it["metadata"]["tags"] = _mock_tags_one(it)
             it["metadata"]["filter_reason"] = "mock"
         return items
 
     prompt = _build_filter_prompt(items, rag_context)
     result = await _llm_chat([
         {"role": "system",
-         "content": "你是一个专业的AI资讯编辑，擅长评估资讯的重要性和相关性。始终以JSON格式回复，不要包含markdown代码块。"},
+         "content": "你是一个专业的 AI 领域新闻编辑，擅长评估 AI/Agent/LLM 新闻的重要性和价值，同时兼顾综合新闻。AI 相关内容优先给高分。始终以 JSON 格式回复，不要包含 markdown 代码块。所有 reason 和标签用中文。"},
         {"role": "user", "content": prompt},
     ], temperature=0.3, max_tokens=2000)
 
     if result is None:
         for it in items:
             it["metadata"]["ai_score"] = _mock_score_one(it)
-            it["metadata"]["tags"] = []
+            it["metadata"]["tags"] = _mock_tags_one(it)
             it["metadata"]["filter_reason"] = "llm_failed"
         return items
 
@@ -231,11 +325,11 @@ async def _score_items(items: list[dict], rag_context: str) -> list[dict]:
                 items[idx]["metadata"]["ai_score"] = float(entry.get("score", 5))
                 items[idx]["metadata"]["tags"] = entry.get("tags", [])
                 items[idx]["metadata"]["filter_reason"] = entry.get("reason", "")
-    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError, AttributeError):
         logger.warning("Score parsing failed, using mock for batch")
         for it in items:
             it["metadata"]["ai_score"] = _mock_score_one(it)
-            it["metadata"]["tags"] = []
+            it["metadata"]["tags"] = _mock_tags_one(it)
             it["metadata"]["filter_reason"] = "parse_failed"
 
     return items

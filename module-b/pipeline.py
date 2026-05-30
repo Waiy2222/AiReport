@@ -25,14 +25,25 @@ async def read_raw_items(pool: asyncpg.Pool, batch_id: uuid.UUID) -> list[dict]:
 
 async def _insert_briefing(conn, briefing_type: str, briefing_date: str,
                            briefing: dict, stats: dict) -> uuid.UUID:
-    """写入 briefings 表——upsert 处理重复运行"""
+    """写入 briefings 表——upsert 处理重复运行，但空数据不覆盖已有有效数据"""
     briefing_id = uuid.uuid4()
     headline = briefing.get("headline", {})
     merged_stats = dict(stats)
     if headline:
         merged_stats["headline"] = headline
 
-    await conn.execute(
+    final_count = sum(len(s.get("items", [])) for s in briefing.get("sections", []))
+
+    if final_count == 0:
+        # 检查是否已有有效数据，避免空跑覆盖
+        existing = await conn.fetchrow(
+            "SELECT id FROM briefings WHERE type=$1 AND date=$2 AND language='zh'",
+            briefing_type, briefing_date,
+        )
+        if existing:
+            return existing["id"]
+
+    actual_id = await conn.fetchval(
         "INSERT INTO briefings (id, type, date, tl_dr, sections, key_takeaways, raw_stats) "
         "VALUES ($1, $2, $3, $4, $5, $6, $7) "
         "ON CONFLICT (type, date, language) DO UPDATE SET "
@@ -40,19 +51,54 @@ async def _insert_briefing(conn, briefing_type: str, briefing_date: str,
         "  sections = EXCLUDED.sections, "
         "  key_takeaways = EXCLUDED.key_takeaways, "
         "  raw_stats = EXCLUDED.raw_stats, "
-        "  generated_at = now()",
+        "  generated_at = now() "
+        "RETURNING id",
         briefing_id,
         briefing_type,
         briefing_date,
-        json.dumps(briefing.get("tl_dr", []), ensure_ascii=False),
-        json.dumps(briefing.get("sections", []), ensure_ascii=False),
-        json.dumps(briefing.get("key_takeaways", []), ensure_ascii=False),
+        briefing.get("tl_dr", []),
+        briefing.get("sections", []),
+        briefing.get("key_takeaways", []),
         json.dumps(merged_stats, ensure_ascii=False),
     )
-    return briefing_id
+    return actual_id
 
 
-async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: str, batch_id: uuid.UUID) -> dict:
+def _filter_items_by_tags(items: list[dict], filter_tags: list[str]) -> list[dict]:
+    """预过滤：在 LLM 摘要前按 mock/LLM 标签过滤 items"""
+    if not filter_tags:
+        return items
+    tag_set = set(filter_tags)
+    result = []
+    for it in items:
+        meta = it.get("metadata", {})
+        if isinstance(meta, str):
+            import json
+            meta = json.loads(meta)
+        item_tags = set(meta.get("tags", []))
+        if tag_set & item_tags:
+            result.append(it)
+    return result
+
+
+def _filter_by_tags(briefing: dict, filter_tags: list[str]) -> dict:
+    """LLM 摘要后标签过滤（作为兜底）"""
+    if not filter_tags:
+        return briefing
+    tag_set = set(filter_tags)
+    filtered_sections = []
+    for section in briefing.get("sections", []):
+        filtered_items = [
+            item for item in section.get("items", [])
+            if tag_set & set(item.get("tags", []))
+        ]
+        if filtered_items:
+            filtered_sections.append({**section, "items": filtered_items})
+    briefing["sections"] = filtered_sections
+    return briefing
+
+
+async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: str, batch_id: uuid.UUID, filter_tags: list[str] | None = None) -> dict:
     """执行完整 AI 加工流水线，返回 briefing_id 和统计信息"""
     stats = {
         "fetched": 0,
@@ -71,8 +117,17 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
             briefing_id = await _insert_briefing(conn, briefing_type, briefing_date, {"tl_dr": [], "sections": [], "key_takeaways": []}, stats)
         return {"briefing_id": briefing_id, "stats": stats, "briefing": {}}
 
-    # ② AI 评分
-    items = await batch_score(items)
+    # ② AI 评分 — 优先使用模块 A 已计算的评分，仅当缺失时才调用 LLM
+    need_scoring = [it for it in items if not it.get("metadata", {}).get("ai_score")]
+    if need_scoring:
+        need_scoring = await batch_score(need_scoring)
+        scored_map = {it["url"]: it.get("ai_score", 5.0) for it in need_scoring}
+        for it in items:
+            if not it.get("metadata", {}).get("ai_score"):
+                it["metadata"]["ai_score"] = scored_map.get(it["url"], 5.0)
+                it["ai_score"] = it["metadata"]["ai_score"]
+    for it in items:
+        it["ai_score"] = float(it.get("metadata", {}).get("ai_score", it.get("ai_score", 5.0)))
     stats["scored"] = len(items)
 
     # ③ 过滤低分 (threshold >= 6)
@@ -94,14 +149,28 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
     passed = await semantic_dedup(passed)
     stats["dedup_semantic_removed"] = before_semantic - len(passed)
 
-    # ⑥ 背景补充
+    # ⑥ 标签预过滤（在 LLM 摘要前按 mock/LLM 标签过滤，确保非 AI 内容也能命中）
+    if filter_tags:
+        passed = _filter_items_by_tags(passed, filter_tags)
+
+    if not passed:
+        async with pool.acquire() as conn:
+            briefing_id = await _insert_briefing(conn, briefing_type, briefing_date, {"tl_dr": [], "sections": [], "key_takeaways": []}, stats)
+        return {"briefing_id": briefing_id, "stats": stats, "briefing": {}}
+
+    # ⑦ 背景补充
     passed = await enrich(passed)
 
-    # ⑦ 摘要 + 标签生成（V2: 含 headline + image_keywords）
+    # ⑧ 摘要 + 标签生成（V2: 含 headline + image_keywords）
     briefing = await summarize(passed, briefing_type)
 
-    # ⑧ 配图匹配（为 sections 中每条 item 匹配 image_url）
+    # ⑨ 配图匹配（为 sections 中每条 item 匹配 image_url）
     briefing = await match_images_for_briefing(briefing)
+
+    # ⑨.⑤ LLM 摘要后兜底过滤
+    if filter_tags:
+        briefing = _filter_by_tags(briefing, filter_tags)
+
     stats["final_count"] = sum(len(s.get("items", [])) for s in briefing.get("sections", []))
 
     # ⑨ 写入 briefings 表（upsert 防重复，headline 存入 raw_stats）

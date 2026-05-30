@@ -105,9 +105,12 @@ async def health():
 
 # ---------- 手动触发全链路 ----------
 @app.post("/admin/trigger")
-async def trigger(type: str = Query(..., description="morning or evening")):
+async def trigger(type: str = Query(..., description="morning or evening"),
+                  tags: str = Query("", description="逗号分隔标签，如 LLM,Agent")):
     if type not in ("morning", "evening"):
         raise HTTPException(400, "type must be morning or evening")
+
+    filter_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
 
     try:
         pool = get_pool()
@@ -118,7 +121,7 @@ async def trigger(type: str = Query(..., description="morning or evening")):
         raise HTTPException(503, "database not available")
 
     try:
-        result = await execute_pipeline(type)
+        result = await execute_pipeline(type, filter_tags=filter_tags)
         return result
     except Exception as e:
         raise HTTPException(500, f"pipeline failed: {e}")

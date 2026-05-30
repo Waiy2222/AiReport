@@ -110,13 +110,16 @@ async def bulk_insert(pool: asyncpg.Pool, items: list[dict]) -> int:
         result = await conn.executemany(
             """
             INSERT INTO raw_items (source, title, url, content, author, published_at, batch_id, metadata, embedding)
-            SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::vector
-            WHERE NOT EXISTS (
-                SELECT 1 FROM raw_items WHERE url = $3 AND batch_id = $7
-            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector)
+            ON CONFLICT (url) DO UPDATE SET
+                batch_id = EXCLUDED.batch_id,
+                metadata = EXCLUDED.metadata,
+                embedding = EXCLUDED.embedding
             """,
             formatted_rows,
         )
+    if result is None:
+        return 0
     inserted = sum(1 for part in result.split("INSERT") if "0 1" in part)
     return inserted
 

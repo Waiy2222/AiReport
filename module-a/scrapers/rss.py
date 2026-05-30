@@ -1,28 +1,39 @@
-"""RSS 多源并发抓取 — 机器之心、量子位、ArXiv、HuggingFace 等"""
+"""RSS 多源并发抓取 — 科技 + 时事 + 国际 + 体育"""
 import asyncio
 import logging
+import re
 import uuid as uuid_lib
 from calendar import timegm
 from datetime import datetime, timezone
 
 import feedparser
-import httpx
-
-from scrapers.filters import filter_items_by_title
 
 logger = logging.getLogger(__name__)
 
 RSS_SOURCES = [
-    {"name": "arxiv",          "url": "https://arxiv.org/rss/cs.AI"},
-    {"name": "jiqizhixin",     "url": "https://www.jiqizhixin.com/rss"},
-    {"name": "qbitai",         "url": "https://www.qbitai.com/feed"},
-    {"name": "huggingface",    "url": "https://huggingface.co/blog/feed.xml"},
-    {"name": "techcrunch_ai",  "url": "https://techcrunch.com/category/artificial-intelligence/feed/"},
+    # ── 科技（中文）──
+    {"name": "qbitai",         "url": "https://www.qbitai.com/feed",           "category": "科技"},
+    {"name": "36kr",           "url": "https://36kr.com/feed",                 "category": "科技"},
+    {"name": "sspai",          "url": "https://sspai.com/feed",                "category": "科技"},
+    {"name": "ithome",         "url": "https://www.ithome.com/rss/",           "category": "科技"},
+    {"name": "ifanr",          "url": "https://www.ifanr.com/feed",            "category": "科技"},
+    {"name": "solidot",        "url": "https://www.solidot.org/index.rss",    "category": "科技"},
+    {"name": "leiphone",       "url": "https://www.leiphone.com/feed",         "category": "科技"},
+    {"name": "techcrunch_ai",  "url": "https://techcrunch.com/category/artificial-intelligence/feed/", "category": "科技"},
+
+    # ── 时事（中文）──
+    {"name": "people",         "url": "http://www.people.com.cn/rss/politics.xml", "category": "时事"},
+
+    # ── 国际（中文）──
+    {"name": "bbc_zh",         "url": "https://feeds.bbci.co.uk/zhongwen/simp/rss.xml", "category": "国际"},
+    {"name": "voa_zh",         "url": "https://www.voachinese.com/api/",       "category": "国际"},
+
+    # ── 体育 ──
+    {"name": "espn",           "url": "https://www.espn.com/espn/rss/news",   "category": "体育"},
 ]
 
 
 async def fetch_single_rss(source: dict) -> list[dict]:
-    """同步抓取单个 RSS 源（在线程池运行以避免阻塞）"""
     loop = asyncio.get_running_loop()
     try:
         feed = await loop.run_in_executor(None, feedparser.parse, source["url"])
@@ -35,13 +46,12 @@ async def fetch_single_rss(source: dict) -> list[dict]:
         return []
 
     return [
-        {**entry, "_source_name": source["name"]}
+        {**entry, "_source_name": source["name"], "_category": source.get("category", "")}
         for entry in feed.entries
     ]
 
 
 async def fetch_rss(since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
-    """主函数：并发抓取所有 RSS 源 → 过滤 → 映射"""
     tasks = [fetch_single_rss(src) for src in RSS_SOURCES]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -53,21 +63,15 @@ async def fetch_rss(since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
             continue
         all_entries.extend(result)
 
-    # 过滤时间
     filtered = [e for e in all_entries if _entry_time(e) >= since]
-
-    # 关键词过滤
-    ai_entries = filter_items_by_title(filtered, "title")
-
-    # 映射为 raw_items
-    return to_raw_items(ai_entries, "rss", batch_id)
+    return to_raw_items(filtered, "rss", batch_id)
 
 
 def to_raw_items(entries: list[dict], source_name: str, batch_id: uuid_lib.UUID) -> list[dict]:
-    """将 RSS entries 映射为 raw_items 行"""
     result = []
     for entry in entries:
         actual_source = entry.pop("_source_name", source_name)
+        category = entry.pop("_category", "")
         result.append({
             "source": actual_source,
             "title": entry.get("title", ""),
@@ -76,18 +80,16 @@ def to_raw_items(entries: list[dict], source_name: str, batch_id: uuid_lib.UUID)
             "author": entry.get("author", ""),
             "published_at": _parse_rss_time(entry),
             "batch_id": batch_id,
-            "metadata": {},
+            "metadata": {"category": category},
         })
     return result
 
 
 def _entry_time(entry: dict) -> datetime:
-    """从 RSS entry 提取 published 时间"""
     return _parse_rss_time(entry)
 
 
 def _parse_rss_time(entry: dict) -> datetime:
-    """解析 RSS 时间字段到 UTC datetime"""
     parsed = entry.get("published_parsed")
     if parsed and len(parsed) >= 6:
         try:
@@ -95,7 +97,6 @@ def _parse_rss_time(entry: dict) -> datetime:
             return datetime.fromtimestamp(ts, tz=timezone.utc)
         except (ValueError, OverflowError, OSError):
             pass
-    # fallback: 尝试字符串解析
     published_str = entry.get("published", "")
     if published_str:
         try:
@@ -108,15 +109,12 @@ def _parse_rss_time(entry: dict) -> datetime:
 
 
 def _clean_html(text: str) -> str:
-    """清理 HTML 标签，保留纯文本"""
     if not text:
         return ""
-    import re
     clean = re.sub(r"<[^>]+>", "", text)
     clean = re.sub(r"\s+", " ", clean)
     return clean.strip()
 
 
 async def fetch(pool, since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
-    """标准 scraper 接口"""
     return await fetch_rss(since, batch_id)

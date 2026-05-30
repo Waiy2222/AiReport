@@ -47,7 +47,7 @@ SELECT
     idx,
     'mock_title_' || gen_random_uuid()::text,
     'https://example.com',
-    tags,
+    tags::jsonb,
     'click'
 FROM briefings b,
 LATERAL (
@@ -71,7 +71,7 @@ SELECT
     0,
     'mock_title_' || gen_random_uuid()::text,
     'https://example.com',
-    '["LLM","开源"]',
+    '["LLM","开源"]'::jsonb,
     'share'
 FROM briefings b
 WHERE b.date >= CURRENT_DATE - INTERVAL '7 days'
@@ -85,7 +85,7 @@ SELECT
     idx,
     'mock_title_' || gen_random_uuid()::text,
     'https://example.com',
-    tags,
+    tags::jsonb,
     'click'
 FROM briefings b,
 LATERAL (
@@ -109,7 +109,7 @@ SELECT
     0,
     'mock_title_' || gen_random_uuid()::text,
     'https://example.com',
-    '["LLM"]',
+    '["LLM"]'::jsonb,
     'view'
 FROM briefings b
 WHERE b.date >= CURRENT_DATE - INTERVAL '3 days'

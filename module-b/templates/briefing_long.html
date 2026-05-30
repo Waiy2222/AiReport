@@ -6,7 +6,13 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
+    {% if for_preview %}
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px;
+    {% else %}
     width: 750px;
+    {% endif %}
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
     background: #0f1724;
     color: #e2e8f0;
@@ -19,6 +25,7 @@
     padding: 48px 40px 40px;
     text-align: center;
     border-bottom: 2px solid #3b82f6;
+    border-radius: 0 0 8px 8px;
   }
   .header .badge {
     display: inline-block;
@@ -46,6 +53,30 @@
     font-size: 16px;
     color: #94a3b8;
   }
+
+  /* ── Toolbar (preview only) ── */
+  .toolbar {
+    margin: 0 40px 24px;
+    text-align: right;
+  }
+  .btn-download {
+    display: inline-block;
+    background: #059669;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn-download:hover { background: #047857; }
+
+  {% if for_preview %}
+  @media (max-width: 700px) {
+    .toolbar { margin-left: 12px; margin-right: 12px; }
+  }
+  {% endif %}
 
   /* ── Headline ── */
   .headline {
@@ -129,12 +160,23 @@
     border-radius: 12px;
     margin-bottom: 16px;
     overflow: hidden;
+    transition: border-color 0.2s;
+    border: 1px solid transparent;
+  }
+  .card:hover {
+    border-color: #3b82f6;
+  }
+  .card a.card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
   }
   .card img {
     width: 100%;
     height: 320px;
     object-fit: cover;
     display: block;
+    background: #1a2332;
   }
   .card-body {
     padding: 20px 24px;
@@ -144,6 +186,18 @@
     font-weight: 700;
     color: #f8fafc;
     margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-body h4 .external-icon {
+    opacity: 0;
+    font-size: 14px;
+    color: #3b82f6;
+    transition: opacity 0.2s;
+  }
+  .card:hover .external-icon {
+    opacity: 1;
   }
   .card-body .summary {
     font-size: 14px;
@@ -220,6 +274,18 @@
     background: #334155;
     margin: 0 auto 16px;
   }
+
+  {% if for_preview %}
+  @media (max-width: 700px) {
+    body { padding: 0 8px; }
+    .header { padding: 32px 20px; }
+    .header h1 { font-size: 22px; }
+    .headline, .tldr, .sections, .takeaways { margin-left: 12px; margin-right: 12px; }
+    .card-body { padding: 14px 16px; }
+    .card-body h4 { font-size: 16px; }
+    .card img { height: 200px; }
+  }
+  {% endif %}
 </style>
 </head>
 <body>
@@ -227,9 +293,15 @@
 <div class="header">
   <div class="badge">{{ 'AI 早报' if briefing_type == 'morning' else 'AI 晚报' }}</div>
   <div class="date">{{ briefing_date }}</div>
-  <h1>AI/Agent 领域资讯速览</h1>
-  <div class="subtitle">{{ final_count }} 条精选 · 聚焦 AI/Agent 领域</div>
+  <h1>每日资讯速览</h1>
+  <div class="subtitle">{{ final_count }} 条精选 · 科技 · 时事 · 体育</div>
 </div>
+
+{% if for_preview and briefing_id %}
+<div class="toolbar">
+  <a class="btn-download" href="/longimage/{{ briefing_id }}" download>下载长图 PNG</a>
+</div>
+{% endif %}
 
 {% if headline and headline.get('title') %}
 <div class="headline">
@@ -254,22 +326,27 @@
   {% for section in sections %}
   <div class="section">
     <div class="section-title">{{ section.section_title }}</div>
-    {% for item in section.items %}
+    {% for item in section['items'] %}
     <div class="card">
-      {% if item.get('image_url') %}
-      <img src="{{ item.image_url }}" alt="{{ item.title }}" />
-      {% endif %}
-      <div class="card-body">
-        <h4>{{ item.title }}</h4>
-        <div class="summary">{{ item.summary }}</div>
-        <div class="card-meta">
-          <span class="score">{{ item.score }} 分</span>
-          <span class="source">{{ item.source }}</span>
-          {% for tag in item.tags %}
-          <span class="tag">{{ tag }}</span>
-          {% endfor %}
+      <a class="card-link" href="{{ item.url }}" target="_blank" rel="noopener">
+        {% if item.get('image_url') %}
+        <img src="{{ item.image_url }}" alt="{{ item.title }}" {% if for_preview %}loading="lazy"{% endif %} onerror="this.style.display='none'" />
+        {% endif %}
+        <div class="card-body">
+          <h4>
+            {{ item.title }}
+            <span class="external-icon">↗</span>
+          </h4>
+          <div class="summary">{{ item.summary }}</div>
+          <div class="card-meta">
+            <span class="score">{{ item.score }} 分</span>
+            <span class="source">{{ item.source }}</span>
+            {% for tag in item.tags %}
+            <span class="tag">{{ tag }}</span>
+            {% endfor %}
+          </div>
         </div>
-      </div>
+      </a>
     </div>
     {% endfor %}
   </div>
@@ -289,7 +366,7 @@
 
 <div class="footer">
   <div class="divider"></div>
-  <div>AI Report · 每日 AI/Agent 资讯速览</div>
+  <div>每日资讯速览 · AI自动化生成</div>
   <div>{{ generated_at }}</div>
 </div>
 

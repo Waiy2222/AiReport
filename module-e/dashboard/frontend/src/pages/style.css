@@ -239,6 +239,42 @@ body {
   display: block;
 }
 
+.briefing-card .bf-actions {
+  margin-top: 10px;
+}
+
+.btn-view {
+  display: inline-block;
+  background: var(--blue);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.btn-view:hover {
+  background: #1d4ed8;
+}
+
+.btn-longimage {
+  display: inline-block;
+  background: #059669;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.btn-longimage:hover {
+  background: #047857;
+}
+
 .badge {
   display: inline-block;
   font-size: 0.72rem;
@@ -250,6 +286,107 @@ body {
 .badge-done    { background: var(--green-bg); color: var(--green); }
 .badge-pending { background: var(--yellow-bg); color: var(--yellow); }
 .badge-failed  { background: var(--red-bg); color: var(--red); }
+
+/* ---------- Tag Selector ---------- */
+.tag-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+}
+
+.tag-group-primary {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+.tag-group-secondary {
+  background: var(--gray-bg);
+  border: 1px solid var(--border);
+}
+
+.tag-group-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-right: 4px;
+}
+
+.tag-group-primary .tag-group-label {
+  color: #4338ca;
+}
+
+.tag-group-secondary .tag-group-label {
+  color: var(--text-secondary);
+}
+
+.tag-filter-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+
+.tag-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  transition: var(--transition);
+  user-select: none;
+}
+
+.tag-checkbox:hover {
+  border-color: var(--blue);
+}
+
+.tag-checkbox:has(input:checked) {
+  background: var(--blue-bg);
+  border-color: var(--blue);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.tag-checkbox-primary:has(input:checked) {
+  background: #c7d2fe;
+  border-color: #6366f1;
+  color: #3730a3;
+  font-weight: 700;
+}
+
+.tag-checkbox input[type="checkbox"] {
+  display: none;
+}
+
+.btn-quick-toggle {
+  margin-left: auto;
+  font-size: 0.72rem;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-quick-toggle:hover {
+  background: #4f46e5;
+}
 
 /* ---------- Trigger Buttons ---------- */
 .trigger-row {

@@ -19,22 +19,24 @@ D_URL = os.getenv("D_URL", "http://module-d:8004/publish")
 F_URL = os.getenv("F_URL", "http://module-f:8006/generate")
 
 
-async def execute_pipeline(type_: str) -> dict:
+async def execute_pipeline(type_: str, filter_tags: list[str] | None = None) -> dict:
     """Execute full pipeline A -> B -> C+D, write run_log entries."""
     batch_id = str(uuid.uuid4())
     today = date.today().isoformat()
     pool = get_pool()
+    tag_str = ",".join(filter_tags) if filter_tags else None
 
     steps = {}
 
     async def log_step(module: str, status: str, detail: dict | None = None):
         step_id = str(uuid.uuid4())
+        is_finished = status != "running"
         await pool.execute(
             """INSERT INTO run_log (id, module, run_type, status, started_at, finished_at, detail)
                VALUES ($1, $2, $3, $4, now(),
-                       CASE WHEN $4 != 'running' THEN now() ELSE NULL END,
-                       COALESCE($5::jsonb, '{}'))""",
-            uuid.UUID(step_id), module, type_, status,
+                       CASE WHEN $5::boolean THEN now() ELSE NULL END,
+                       COALESCE($6::jsonb, '{}'))""",
+            uuid.UUID(step_id), module, type_, status, is_finished,
             json.dumps(detail) if detail else None,
         )
         return step_id
@@ -57,7 +59,10 @@ async def execute_pipeline(type_: str) -> dict:
         await log_step("B", "running")
         briefing_id = None
         try:
-            r = await client.post(B_URL, json={"type": type_, "date": today, "batch_id": batch_id})
+            b_payload: dict = {"type": type_, "date": today, "batch_id": batch_id}
+            if filter_tags:
+                b_payload["tags"] = filter_tags
+            r = await client.post(B_URL, json=b_payload)
             r.raise_for_status()
             steps["process"] = r.json()
             briefing_id = steps["process"].get("briefing_id")

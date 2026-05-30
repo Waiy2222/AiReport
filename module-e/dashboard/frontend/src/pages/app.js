@@ -109,30 +109,28 @@ function renderModuleHealth(healthAll, overviewModules) {
 // ---------- Render Overview (briefings) ----------
 function renderOverview(ov) {
   const container = document.getElementById("briefingCards");
+  // preview 在 module-b (8002) 或 nginx (80)，用 nginx 透传
+  const previewBase = `${window.location.protocol}//${window.location.hostname}/preview/`;
   let html = "";
   ["morning", "evening"].forEach((type) => {
     const d = ov[type] || {};
     const status = d.status || "pending";
-    const bid = d.briefing_id || "—";
+    const bid = d.briefing_id || null;
     const genAt = d.generated_at || null;
-    const rawStats = d.raw_stats || null;
-    let tlDr = "暂无内容";
-    if (rawStats) {
-      try {
-        const parsed = typeof rawStats === "string" ? JSON.parse(rawStats) : rawStats;
-        tlDr = parsed.tl_dr || parsed.tldr || parsed.summary || JSON.stringify(parsed, null, 2);
-      } catch (e) { tlDr = String(rawStats); }
-    }
     const label = type === "morning" ? "早报" : "晚报";
+    const previewUrl = bid ? `${previewBase}${bid}` : "#";
     html += `
-      <div class="briefing-card" onclick="toggleBriefing(this)" data-tldr="${escapeHtml(String(tlDr))}">
+      <div class="briefing-card">
         <div class="bf-header">
           <span class="bf-type">${label}</span>
           <span class="badge badge-${status}">${statusLabel(status)}</span>
         </div>
-        <div class="bf-id">ID: ${bid}</div>
+        <div class="bf-id">ID: ${bid || "—"}</div>
         <div class="bf-time">${genAt ? formatTime(genAt) : "—"}</div>
-        <div class="bf-tldr">${escapeHtml(String(tlDr))}</div>
+        <div class="bf-actions">
+          ${bid ? `<a href="${previewUrl}" target="_blank" class="btn btn-view">查看简报</a>
+                   <a href="${previewBase.replace('/preview/', '/longimage/')}${bid}" class="btn btn-longimage">下载长图</a>` : ""}
+        </div>
       </div>`;
   });
   container.innerHTML = html;
@@ -145,6 +143,17 @@ function toggleBriefing(el) {
 }
 
 // ---------- Trigger Pipeline ----------
+function getSelectedTags() {
+  const checked = document.querySelectorAll("#tagSelector input[type=checkbox]:checked");
+  return Array.from(checked).map(cb => cb.value).join(",");
+}
+
+function toggleAICore() {
+  const boxes = document.querySelectorAll(".tag-group-primary input[type=checkbox]");
+  const anyUnchecked = Array.from(boxes).some(cb => !cb.checked);
+  boxes.forEach(cb => { cb.checked = anyUnchecked; });
+}
+
 async function triggerPipeline(type) {
   const btnId = type === "morning" ? "triggerMorning" : "triggerEvening";
   const btn = document.getElementById(btnId);
@@ -156,12 +165,15 @@ async function triggerPipeline(type) {
   fb.innerHTML = "";
   fb.className = "trigger-feedback";
 
+  const tags = getSelectedTags();
+  let url = `/admin/trigger?type=${type}`;
+  if (tags) url += `&tags=${encodeURIComponent(tags)}`;
+
   try {
-    const result = await apiPost(`/admin/trigger?type=${type}`);
+    const result = await apiPost(url);
     fb.innerHTML = `触发成功: batch_id=${result.batch_id}, status=${result.status}`;
     fb.className = "trigger-feedback success";
     showToast("success", `${type === "morning" ? "早报" : "晚报"}流水线触发成功`);
-    // Reload data after a short delay
     setTimeout(loadAll, 3000);
   } catch (e) {
     fb.innerHTML = `触发失败: ${e.message}`;

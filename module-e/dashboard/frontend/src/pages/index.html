@@ -40,6 +40,28 @@
     <!-- ========== Pipeline Trigger ========== -->
     <section class="section trigger-section">
       <h2 class="section-title">手动触发流水线</h2>
+      <div class="tag-selector" id="tagSelector">
+        <div class="tag-group tag-group-primary">
+          <span class="tag-group-label">智能体核心</span>
+          <label class="tag-checkbox tag-checkbox-primary"><input type="checkbox" value="科技" checked> 科技</label>
+          <label class="tag-checkbox tag-checkbox-primary"><input type="checkbox" value="LLM" checked> LLM</label>
+          <label class="tag-checkbox tag-checkbox-primary"><input type="checkbox" value="Agent" checked> Agent</label>
+          <label class="tag-checkbox tag-checkbox-primary"><input type="checkbox" value="开源" checked> 开源</label>
+          <label class="tag-checkbox tag-checkbox-primary"><input type="checkbox" value="框架" checked> 框架</label>
+          <label class="tag-checkbox tag-checkbox-primary"><input type="checkbox" value="工具" checked> 工具</label>
+          <label class="tag-checkbox tag-checkbox-primary"><input type="checkbox" value="基础设施" checked> 基础设施</label>
+          <button class="btn-quick-toggle" onclick="toggleAICore()" title="一键切换智能体核心标签">全选/取消</button>
+        </div>
+        <div class="tag-group tag-group-secondary">
+          <span class="tag-group-label">扩展领域</span>
+          <label class="tag-checkbox"><input type="checkbox" value="时事"> 时事</label>
+          <label class="tag-checkbox"><input type="checkbox" value="国际"> 国际</label>
+          <label class="tag-checkbox"><input type="checkbox" value="体育"> 体育</label>
+          <label class="tag-checkbox"><input type="checkbox" value="政策"> 政策</label>
+          <label class="tag-checkbox"><input type="checkbox" value="财经"> 财经</label>
+        </div>
+        </div>
+      </div>
       <div class="trigger-row">
         <button class="btn btn-trigger btn-morning" id="triggerMorning" onclick="triggerPipeline('morning')">
           触发早报

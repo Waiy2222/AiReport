@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from db import get_pool, init_db, close_db
 from pipeline import run_pipeline
-from ai.render_longimage import render_longimage
+from ai.render_longimage import render_longimage, _render_html
 
 def _get_pool_or_503():
     try:
@@ -38,6 +38,7 @@ class ProcessRequest(BaseModel):
     type: str  # morning / evening
     date: str  # YYYY-MM-DD
     batch_id: str
+    tags: list[str] | None = None  # 可选：按标签过滤
 
 
 @app.get("/health")
@@ -59,7 +60,7 @@ async def run_b(req: ProcessRequest):
     batch_id = uuid.UUID(req.batch_id)
 
     pool = _get_pool_or_503()
-    result = await run_pipeline(pool, req.type, str(briefing_date), batch_id)
+    result = await run_pipeline(pool, req.type, briefing_date, batch_id, filter_tags=req.tags)
 
     return {
         "status": "ok",
@@ -105,3 +106,33 @@ async def longimage(briefing_id: str):
 
     png_bytes = await render_longimage(briefing, row["type"], str(row["date"]), raw_stats)
     return Response(content=png_bytes, media_type="image/png")
+
+
+@app.get("/preview/{briefing_id}")
+async def preview(briefing_id: str):
+    """直接返回简报 HTML 页面（无需 Playwright，浏览器打开即可阅读）"""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, type, date, tl_dr, sections, key_takeaways, raw_stats "
+            "FROM briefings WHERE id = $1",
+            uuid.UUID(briefing_id),
+        )
+    if not row:
+        raise HTTPException(404, "briefing not found")
+
+    tl_dr = _parse_jsonb(row["tl_dr"])
+    sections = _parse_jsonb(row["sections"])
+    key_takeaways = _parse_jsonb(row["key_takeaways"])
+    raw_stats = _parse_jsonb(row["raw_stats"])
+    headline = raw_stats.get("headline", {}) if isinstance(raw_stats, dict) else {}
+
+    briefing = {
+        "headline": headline,
+        "tl_dr": tl_dr,
+        "sections": sections,
+        "key_takeaways": key_takeaways,
+    }
+
+    html = _render_html(briefing, row["type"], str(row["date"]), raw_stats, for_preview=True, briefing_id=str(row["id"]))
+    return Response(content=html, media_type="text/html")

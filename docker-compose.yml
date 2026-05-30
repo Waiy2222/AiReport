@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # Phase 2: pgvector 替代原生 postgres
   postgres:
@@ -23,7 +21,9 @@ services:
       retries: 5
 
   module-a:
-    build: ./module-a
+    build:
+      context: .
+      dockerfile: ./module-a/Dockerfile
     ports:
       - "8001:8001"
     environment:

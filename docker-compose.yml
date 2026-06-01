@@ -57,9 +57,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
       WECHAT_APPID: ${WECHAT_APPID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
+      WX_TEMPLATE_ID: ${WX_TEMPLATE_ID:-}
       WEIXIN_OA_APPID: ${WEIXIN_OA_APPID:-}
       WEIXIN_OA_SECRET: ${WEIXIN_OA_SECRET:-}
       WEIXIN_OA_TOKEN: ${WEIXIN_OA_TOKEN:-}
+      H5_BASE_URL: ${H5_BASE_URL:-http://localhost:8003/h5}
     depends_on:
       postgres:
         condition: service_healthy

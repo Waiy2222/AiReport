@@ -362,7 +362,7 @@ async def push(req: PushRequest):
         or (btype == "evening" and t.get("evening_enabled", True))
     ]
 
-    if not os.getenv("WX_APPID"):
+    if not os.getenv("WECHAT_APPID"):
         return {
             "status": "dry_run",
             "briefing_id": str(briefing["id"]),

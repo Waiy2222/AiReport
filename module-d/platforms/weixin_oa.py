@@ -18,9 +18,13 @@ PUBLISH_URL = "https://api.weixin.qq.com/cgi-bin/freepublish/submit"
 
 
 def dry_run(briefing: dict) -> str:
-    """dry-run 模式：只生成 HTML，不调用任何微信 API"""
-    from renderer import render_article
-    html = render_article(briefing)
+    """dry-run 模式：只生成 HTML，不调用任何微信 API
+
+    使用 platforms/weixin.py 的 render_briefing_html（绿色 WeChat 品牌色系，
+    带头条大图、标签、配图等丰富样式），替代 renderer.py 的简化版渲染。
+    """
+    from .weixin import render_briefing_html
+    html = render_briefing_html(briefing)
     return html
 
 

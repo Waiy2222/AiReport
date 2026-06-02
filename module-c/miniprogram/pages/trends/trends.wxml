@@ -1,0 +1,71 @@
+<view class="container">
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">趋势分析中...</text>
+  </view>
+
+  <!-- 错误状态 -->
+  <view wx:elif="{{error}}" class="empty-state">
+    <text class="empty-icon">⚠️</text>
+    <text class="empty-text">加载失败，下拉刷新重试</text>
+  </view>
+
+  <!-- 正常内容 -->
+  <view wx:else>
+    <!-- Agent 解读卡片 -->
+    <view class="agent-insight-card" wx:if="{{agent_insight}}">
+      <view class="insight-header">
+        <text class="insight-icon">🤖</text>
+        <text class="insight-title">Agent 趋势解读</text>
+      </view>
+      <text class="insight-text">{{agent_insight}}</text>
+      <text class="insight-period">{{period}}</text>
+    </view>
+
+    <!-- 🔥 热度飙升榜 -->
+    <view class="trend-section" wx:if="{{rising.length}}">
+      <text class="section-label">🔥 热度飙升榜</text>
+      <view class="trend-item" wx:for="{{rising}}" wx:key="tag" bindtap="onTagTap" data-tag="{{item.tag}}">
+        <view class="trend-left">
+          <text class="trend-tag">{{item.label_zh}}</text>
+          <text class="trend-change up">↑{{item.change_pct}}%</text>
+        </view>
+        <view class="mini-chart">
+          <view class="mini-bar bar-rising" style="height: {{item.previous * 4 < 4 ? 4 : item.previous * 4}}px"></view>
+          <view class="mini-bar bar-rising" style="height: {{item.current * 4 > 40 ? 40 : item.current * 4}}px"></view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ❄️ 热度降温榜 -->
+    <view class="trend-section" wx:if="{{falling.length}}">
+      <text class="section-label">❄️ 热度降温榜</text>
+      <view class="trend-item" wx:for="{{falling}}" wx:key="tag" bindtap="onTagTap" data-tag="{{item.tag}}">
+        <view class="trend-left">
+          <text class="trend-tag">{{item.label_zh}}</text>
+          <text class="trend-change down">↓{{item.change_pct}}%</text>
+        </view>
+        <view class="mini-chart">
+          <view class="mini-bar bar-falling" style="height: {{item.previous * 4 < 4 ? 4 : item.previous * 4}}px"></view>
+          <view class="mini-bar bar-falling" style="height: {{item.current * 4 > 40 ? 40 : item.current * 4}}px"></view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 🆕 新兴标签 -->
+    <view class="trend-section" wx:if="{{new_tags.length}}">
+      <text class="section-label">🆕 新兴标签</text>
+      <view class="trend-item new-tag-item" wx:for="{{new_tags}}" wx:key="tag" bindtap="onTagTap" data-tag="{{item.tag}}">
+        <text class="trend-tag">{{item.label_zh}}</text>
+        <view class="new-badge">首次出现</view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view wx:if="{{!rising.length && !falling.length && !new_tags.length}}" class="empty-state">
+      <text class="empty-icon">📊</text>
+      <text class="empty-text">暂无趋势数据</text>
+    </view>
+  </view>
+</view>

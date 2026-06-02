@@ -70,4 +70,13 @@ module.exports = {
   reportBehavior(data) {
     return request("/api/behavior", "POST", data);
   },
+
+  // Phase 3 趋势接口
+  getWeeklyTrends() {
+    return request("/api/trends/weekly");
+  },
+
+  getTagTrend(tag) {
+    return request(`/api/trends/tag/${encodeURIComponent(tag)}`);
+  },
 };

@@ -3,6 +3,7 @@
     "pages/index/index",
     "pages/detail/detail",
     "pages/history/history",
+    "pages/trends/trends",
     "pages/mine/mine"
   ],
   "window": {
@@ -22,6 +23,12 @@
       {
         "pagePath": "pages/history/history",
         "text": "历史"
+      },
+      {
+        "pagePath": "pages/trends/trends",
+        "text": "趋势",
+        "iconPath": "images/trend.png",
+        "selectedIconPath": "images/trend-active.png"
       },
       {
         "pagePath": "pages/mine/mine",

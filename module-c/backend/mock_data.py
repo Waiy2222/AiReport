@@ -191,18 +191,27 @@ def get_subscriptions():
 # ── Phase 2 新增假数据 ──────────────────────────────────────────
 
 TAG_CATALOG = [
+    # AI 核心领域
     {"tag": "LLM", "category": "topic", "label_zh": "大模型", "description": "LLM/ChatGPT/Claude/Gemini等", "sort_order": 1},
     {"tag": "开源", "category": "topic", "label_zh": "开源项目", "description": "开源框架、工具、模型", "sort_order": 2},
-    {"tag": "Python", "category": "topic", "label_zh": "Python", "description": "Python生态/AI开发", "sort_order": 3},
-    {"tag": "AI安全", "category": "topic", "label_zh": "AI安全", "description": "对齐/红队/鲁棒性", "sort_order": 4},
-    {"tag": "Agent", "category": "topic", "label_zh": "智能体", "description": "AI Agent/多Agent协作", "sort_order": 5},
-    {"tag": "AI产品", "category": "topic", "label_zh": "AI产品", "description": "AI应用/商业化/SaaS", "sort_order": 6},
-    {"tag": "RAG", "category": "topic", "label_zh": "RAG", "description": "检索增强生成", "sort_order": 7},
-    {"tag": "多模态", "category": "topic", "label_zh": "多模态", "description": "视觉/语音/视频理解", "sort_order": 8},
-    {"tag": "AI编程", "category": "topic", "label_zh": "AI编程", "description": "Copilot/IDE/代码生成", "sort_order": 9},
+    {"tag": "Agent", "category": "topic", "label_zh": "智能体", "description": "AI Agent/多Agent协作", "sort_order": 3},
+    {"tag": "基础设施", "category": "topic", "label_zh": "基础设施", "description": "GPU/推理/部署/向量数据库", "sort_order": 4},
+    {"tag": "多模态", "category": "topic", "label_zh": "多模态", "description": "视觉/语音/视频理解", "sort_order": 5},
+    {"tag": "RAG", "category": "topic", "label_zh": "RAG", "description": "检索增强生成", "sort_order": 6},
+    {"tag": "AI编程", "category": "topic", "label_zh": "AI编程", "description": "Copilot/IDE/代码生成", "sort_order": 7},
+    {"tag": "AI产品", "category": "topic", "label_zh": "AI产品", "description": "AI应用/商业化/SaaS", "sort_order": 8},
+    {"tag": "AI安全", "category": "topic", "label_zh": "AI安全", "description": "对齐/红队/鲁棒性", "sort_order": 9},
     {"tag": "AI政策", "category": "topic", "label_zh": "AI政策", "description": "监管/合规/政策/伦理", "sort_order": 10},
     {"tag": "融资", "category": "topic", "label_zh": "融资并购", "description": "AI创投/融资/acquisition", "sort_order": 11},
-    {"tag": "基础设施", "category": "topic", "label_zh": "基础设施", "description": "GPU/推理/部署/向量数据库", "sort_order": 12},
+    {"tag": "Python", "category": "topic", "label_zh": "Python", "description": "Python生态/AI开发", "sort_order": 12},
+    # 扩展领域（简报中也覆盖的通用领域）
+    {"tag": "科技", "category": "domain", "label_zh": "科技", "description": "科技互联网/数码硬件", "sort_order": 13},
+    {"tag": "工具", "category": "domain", "label_zh": "工具", "description": "实用工具/效率应用", "sort_order": 14},
+    {"tag": "体育", "category": "domain", "label_zh": "体育", "description": "体育赛事/NBA/足球等", "sort_order": 15},
+    {"tag": "时事", "category": "domain", "label_zh": "时事", "description": "国内外时事新闻", "sort_order": 16},
+    {"tag": "国际", "category": "domain", "label_zh": "国际", "description": "国际关系/地缘政治", "sort_order": 17},
+    {"tag": "政策", "category": "domain", "label_zh": "政策", "description": "政策法规/产业规划", "sort_order": 18},
+    {"tag": "安全", "category": "domain", "label_zh": "安全", "description": "网络安全/隐私保护", "sort_order": 19},
 ]
 
 MOCK_USER_PREFERENCES = {

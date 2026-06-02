@@ -7,7 +7,6 @@ Page({
     openidMasked: "",
     morningEnabled: false,
     eveningEnabled: false,
-    // Phase 2: 标签偏好
     allTags: [],
     selectedTags: [],
     loadingTags: true,
@@ -15,6 +14,8 @@ Page({
 
   onLoad() {
     const openid = app.globalData.openid || "mock_openid_user_001";
+    const storedTags = wx.getStorageSync("userTags") || [];
+    app.globalData.userTags = storedTags;
     this.setData({
       openid,
       openidMasked: openid.substring(0, 8) + "***" + openid.slice(-4),
@@ -23,7 +24,6 @@ Page({
   },
 
   onShow() {
-    // 页面显示时刷新偏好
     if (this.data.openid) {
       this.loadTagsAndPreferences();
     }
@@ -32,7 +32,7 @@ Page({
   async loadTagsAndPreferences() {
     try {
       const tagsResp = await api.getTags();
-      const tags = tagsResp.tags || [];
+      const catalogTags = tagsResp.tags || [];
 
       let selectedTags = [];
       try {
@@ -42,17 +42,17 @@ Page({
         console.warn("获取偏好失败", e);
       }
 
-      // 标记已选中的标签
-      const allTags = tags.map((t) => ({
+      // 从全局读取首页已缓存的活跃标签（首页加载简报时自动收集）
+      const activeTagSet = app.globalData.activeTagSet || {};
+
+      const allTags = catalogTags.map((t) => ({
         ...t,
         selected: selectedTags.indexOf(t.tag) >= 0,
+        disabled: Object.keys(activeTagSet).length > 0 && !activeTagSet[t.tag],
+        hasNews: Object.keys(activeTagSet).length === 0 || !!activeTagSet[t.tag],
       }));
 
-      this.setData({
-        allTags,
-        selectedTags,
-        loadingTags: false,
-      });
+      this.setData({ allTags, selectedTags, loadingTags: false });
     } catch (e) {
       console.error("加载标签失败", e);
       this.setData({ loadingTags: false });
@@ -62,45 +62,46 @@ Page({
   onTagTap(e) {
     const tag = e.currentTarget.dataset.tag;
     const { allTags, selectedTags } = this.data;
-    const idx = selectedTags.indexOf(tag);
-    let newSelected;
+    const activeTagSet = app.globalData.activeTagSet || {};
 
-    if (idx >= 0) {
-      newSelected = selectedTags.filter((t) => t !== tag);
-    } else {
-      newSelected = [...selectedTags, tag];
+    // 简报里没有相关新闻的标签不可选
+    if (Object.keys(activeTagSet).length > 0 && !activeTagSet[tag]) {
+      wx.showToast({ title: "暂无相关新闻", icon: "none", duration: 1000 });
+      return;
     }
+
+    const idx = selectedTags.indexOf(tag);
+    const newSelected = idx >= 0
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
 
     const newAllTags = allTags.map((t) => ({
       ...t,
       selected: newSelected.indexOf(t.tag) >= 0,
     }));
 
-    this.setData({
-      allTags: newAllTags,
-      selectedTags: newSelected,
-    });
+    this.setData({ allTags: newAllTags, selectedTags: newSelected });
   },
 
   async onSavePreferences() {
     const { openid, selectedTags } = this.data;
     try {
       await api.setPreferences(openid, selectedTags);
-      wx.showToast({ title: "已保存", icon: "success" });
+      app.globalData.userTags = selectedTags;
+      wx.setStorageSync("userTags", selectedTags);
+      wx.showToast({ title: "已保存，内容已过滤", icon: "success" });
     } catch (e) {
       wx.showToast({ title: "保存失败", icon: "none" });
     }
   },
 
   onToggleMorning(e) {
-    const enabled = e.detail.value;
-    this.setData({ morningEnabled: enabled });
+    this.setData({ morningEnabled: e.detail.value });
     this.saveSubscription();
   },
 
   onToggleEvening(e) {
-    const enabled = e.detail.value;
-    this.setData({ eveningEnabled: enabled });
+    this.setData({ eveningEnabled: e.detail.value });
     this.saveSubscription();
   },
 
@@ -121,8 +122,7 @@ Page({
   onAbout() {
     wx.showModal({
       title: "AI 资讯简报",
-      content:
-        "每天 8:00 / 20:00 自动推送 AI 和智能体领域精选开源资讯。由 AI 评分、去重、摘要后生成中英双语简报。",
+      content: "每天 8:00 / 20:00 自动推送 AI 和智能体领域精选开源资讯。由 AI 评分、去重、摘要后生成中英双语简报。",
       showCancel: false,
     });
   },

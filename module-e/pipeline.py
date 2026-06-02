@@ -44,7 +44,7 @@ async def execute_pipeline(type_: str, filter_tags: list[str] | None = None) -> 
     # Step 1: A - fetch
     await log_step("A", "running")
     async with httpx.AsyncClient(timeout=180) as client:
-        hours = 12
+        hours = 24 if type_ == "morning" else 12
         try:
             r = await client.post(A_URL, json={"batch_id": batch_id, "hours_back": hours})
             r.raise_for_status()

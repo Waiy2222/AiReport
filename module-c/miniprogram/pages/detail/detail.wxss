@@ -82,6 +82,12 @@
   margin-bottom: 6px;
 }
 
+.article-image {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
 .article-summary {
   font-size: 13px;
   color: #666;

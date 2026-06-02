@@ -70,7 +70,7 @@ _MORNING_SECTIONS = f"{_AI_CORE_SECTIONS}, {_EXTENDED_SECTIONS}"
 _EVENING_SECTIONS = _MORNING_SECTIONS
 
 _AI_CORE_TAGS = "LLM, Agent, 开源, 框架, 工具, 基础设施, 科技"
-_EXTENDED_TAGS = "政策, 时事, 国际, 体育, 财经"
+_EXTENDED_TAGS = "政策, 时事, 国际, 体育"
 _ALL_TAGS = f"{_AI_CORE_TAGS}, {_EXTENDED_TAGS}"
 
 MORNING_SUMMARY_SYSTEM = f"""你是 AI 领域新闻早报主编。当前时间：早上 8:00。

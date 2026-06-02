@@ -16,6 +16,14 @@
   <!-- 日期标题 -->
   <view wx:if="{{briefing}}" class="date-header">{{dateText}} · {{currentTab === 'morning' ? '早报' : '晚报'}}</view>
 
+  <!-- 标签过滤提示 -->
+  <view wx:if="{{activeTags.length > 0}}" class="filter-hint">
+    <text class="filter-icon">🏷️</text>
+    <text>已按兴趣过滤：</text>
+    <text class="filter-tags">{{activeTags.join('、')}}</text>
+    <text class="filter-count">（显示匹配内容）</text>
+  </view>
+
   <!-- 加载中 -->
   <view wx:if="{{loading}}" class="loading">加载中...</view>
 

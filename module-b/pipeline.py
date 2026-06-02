@@ -1,6 +1,7 @@
 """七步管道串联 — 读 raw_items → AI 加工 → 配图 → 写 briefings"""
 import json
 import uuid
+import logging
 import asyncpg
 
 from ai.analyzer import batch_score
@@ -9,7 +10,36 @@ from ai.enricher import enrich
 from ai.summarizer import summarize
 from ai.image_matcher import match_images_for_briefing
 
+logger = logging.getLogger(__name__)
 SCORE_THRESHOLD = 6
+
+
+def _parse_metadata(it: dict) -> dict:
+    """安全解析 metadata 字段：处理 None / 缺失 / JSON 字符串三种情况"""
+    meta = it.get("metadata")
+    if meta is None:
+        return {}
+    if isinstance(meta, str):
+        try:
+            return json.loads(meta)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("Failed to parse metadata JSON string for item: %s", it.get("title", "?"))
+            return {}
+    if isinstance(meta, dict):
+        return meta
+    return {}
+
+
+def _get_ai_score(it: dict) -> float:
+    """安全获取 ai_score：优先从 metadata 取，其次从 item 直接字段"""
+    meta = _parse_metadata(it)
+    score = meta.get("ai_score")
+    if score is not None:
+        return float(score)
+    score = it.get("ai_score")
+    if score is not None:
+        return float(score)
+    return 0.0
 
 
 async def read_raw_items(pool: asyncpg.Pool, batch_id: uuid.UUID) -> list[dict]:
@@ -71,10 +101,7 @@ def _filter_items_by_tags(items: list[dict], filter_tags: list[str]) -> list[dic
     tag_set = set(filter_tags)
     result = []
     for it in items:
-        meta = it.get("metadata", {})
-        if isinstance(meta, str):
-            import json
-            meta = json.loads(meta)
+        meta = _parse_metadata(it)
         item_tags = set(meta.get("tags", []))
         if tag_set & item_tags:
             result.append(it)
@@ -118,16 +145,19 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
         return {"briefing_id": briefing_id, "stats": stats, "briefing": {}}
 
     # ② AI 评分 — 优先使用模块 A 已计算的评分，仅当缺失时才调用 LLM
-    need_scoring = [it for it in items if not it.get("metadata", {}).get("ai_score")]
+    need_scoring = [it for it in items if not _get_ai_score(it)]
     if need_scoring:
-        need_scoring = await batch_score(need_scoring)
-        scored_map = {it["url"]: it.get("ai_score", 5.0) for it in need_scoring}
+        scored_batch = await batch_score(need_scoring)
+        scored_map = {it["url"]: it.get("ai_score", 5.0) for it in scored_batch}
         for it in items:
-            if not it.get("metadata", {}).get("ai_score"):
-                it["metadata"]["ai_score"] = scored_map.get(it["url"], 5.0)
-                it["ai_score"] = it["metadata"]["ai_score"]
+            if not _get_ai_score(it):
+                meta = _parse_metadata(it)
+                new_score = scored_map.get(it["url"], 5.0)
+                meta["ai_score"] = new_score
+                it["metadata"] = meta
+                it["ai_score"] = new_score
     for it in items:
-        it["ai_score"] = float(it.get("metadata", {}).get("ai_score", it.get("ai_score", 5.0)))
+        it["ai_score"] = _get_ai_score(it) or 5.0
     stats["scored"] = len(items)
 
     # ③ 过滤低分 (threshold >= 6)

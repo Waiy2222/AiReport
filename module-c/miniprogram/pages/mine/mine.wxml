@@ -16,14 +16,14 @@
       <view class="tag-hint selected" wx:else>已选 {{selectedTags.length}} 个标签，将推送个性化内容</view>
       <view class="tag-grid">
         <view
-          class="tag-chip {{item.selected ? 'selected' : ''}}"
+          class="tag-chip {{item.disabled ? 'disabled' : ''}} {{item.selected ? 'selected' : ''}}"
           wx:for="{{allTags}}"
           wx:key="tag"
           data-tag="{{item.tag}}"
           bindtap="onTagTap"
         >
-          <view class="tag-label">{{item.label_zh}}</view>
-          <view class="tag-desc">{{item.description}}</view>
+          <view class="tag-label">{{item.label_zh}}{{item.disabled ? ' (暂无)' : ''}}</view>
+          <view class="tag-desc">{{item.hasNews ? item.description : '当前简报无相关新闻'}}</view>
         </view>
       </view>
       <button class="save-btn" bindtap="onSavePreferences">保存偏好</button>

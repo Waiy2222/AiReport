@@ -26,8 +26,34 @@
 .date-header {
   font-size: 14px;
   color: #999;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding-left: 4px;
+}
+
+.filter-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: #e8f0fe;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #4a90d9;
+}
+
+.filter-icon {
+  margin-right: 2px;
+}
+
+.filter-tags {
+  font-weight: 600;
+}
+
+.filter-count {
+  color: #999;
+  font-size: 11px;
 }
 
 .tl-card {

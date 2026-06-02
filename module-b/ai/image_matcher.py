@@ -1,9 +1,11 @@
-"""配图匹配 — 3 级回退：OG 图 → Unsplash → 分类默认"""
+"""配图匹配 — 4 级回退：OG 图 → Unsplash → Pexels → 分类默认"""
 import os
 import re
+import random
 import httpx
 
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY", "")
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
 
 # ── 分类 → 默认搜索关键词映射 ──
 CATEGORY_DEFAULTS = {
@@ -72,22 +74,38 @@ async def _search_unsplash(query: str) -> str | None:
     return None
 
 
-def _get_category_fallback(item: dict) -> str:
-    """Tier 3: 根据分类/标签返回默认配图 URL（使用 Unsplash source 直接 URL）"""
+async def _search_pexels(query: str) -> str | None:
+    """Tier 2.5: Pexels API 搜索（国内可访问）"""
+    if not PEXELS_API_KEY:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://api.pexels.com/v1/search",
+                params={"query": query, "per_page": 1, "orientation": "landscape"},
+                headers={"Authorization": PEXELS_API_KEY},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                photos = data.get("photos", [])
+                if photos:
+                    return photos[0]["src"]["medium"]  # 800px 宽度适合移动端
+    except Exception:
+        pass
+    return None
+
+
+def _get_fallback_keywords(item: dict) -> str:
+    """根据分类/标签返回默认搜索关键词"""
     tags = item.get("tags", [])
     section_title = item.get("_section_title", "")
 
-    keywords = None
     for tag in tags:
         if tag in CATEGORY_DEFAULTS:
-            keywords = CATEGORY_DEFAULTS[tag]
-            break
-    if keywords is None and section_title in CATEGORY_DEFAULTS:
-        keywords = CATEGORY_DEFAULTS[section_title]
-    if keywords is None:
-        keywords = "artificial intelligence technology"
-
-    return f"https://source.unsplash.com/800x400/?{keywords.replace(' ', ',')}"
+            return CATEGORY_DEFAULTS[tag]
+    if section_title in CATEGORY_DEFAULTS:
+        return CATEGORY_DEFAULTS[section_title]
+    return "artificial intelligence technology"
 
 
 async def match_image(item: dict) -> str:
@@ -107,8 +125,20 @@ async def match_image(item: dict) -> str:
         if unsplash_url:
             return unsplash_url
 
-    # Tier 3: 分类默认
-    return _get_category_fallback(item)
+    # Tier 2.5: Pexels 搜索（国内可用，备选）
+    if keywords:
+        pexels_url = await _search_pexels(keywords)
+        if pexels_url:
+            return pexels_url
+
+    # Tier 3: 分类默认（用 Pexels 关键词兜底，避免 Unsplash 慢）
+    fallback_keywords = _get_fallback_keywords(item)
+    pexels_fallback = await _search_pexels(fallback_keywords)
+    if pexels_fallback:
+        return pexels_fallback
+
+    # Tier 4: 实在没有走 Unsplash direct URL（可能慢）
+    return f"https://source.unsplash.com/800x400/?{fallback_keywords.replace(' ', ',')}"
 
 
 async def match_images_for_briefing(briefing: dict) -> dict:

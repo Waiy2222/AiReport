@@ -415,8 +415,10 @@ async def _dedup_via_api(items: list[dict]) -> tuple[list[dict], int]:
             f"    内容: {it['content'][:200]}"
         )
     prompt = (
-        "识别以下资讯中报道同一事件的重复/近似重复条目，返回需要删除的索引数组"
-        "（保留质量最高的一条）。以JSON数组格式返回如 [1,5,7]。没有重复则返回 []。\n\n"
+        "严格识别以下资讯中的重复条目，返回所有应删除的索引数组。\n"
+        "重复包括：同一事件不同媒体报道、同一产品不同角度、同一场比赛不同来源。\n"
+        "保留评分最高/信息最丰富的一条，删除其余。\n"
+        "以JSON数组格式返回如 [1,5,7]。没有重复则返回 []。\n\n"
         + "\n\n".join(lines)
     )
     result = await _llm_chat([
@@ -453,7 +455,7 @@ def _dedup_heuristic(items: list[dict]) -> tuple[list[dict], int]:
                 continue
             overlap = len(tokens & seen)
             union = len(tokens | seen)
-            if overlap / union > 0.5:  # more than 50% overlap
+            if overlap / union > 0.35:  # more than 35% overlap → duplicate
                 is_dup = True
                 break
         if is_dup:

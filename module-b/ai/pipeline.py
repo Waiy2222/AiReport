@@ -278,10 +278,27 @@ async def _score_via_api(items: list[dict]) -> None:
 
 def _build_score_prompt(batch: list[dict]) -> str:
     lines = []
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
     for idx, it in enumerate(batch):
+        # 计算新闻距今多久
+        age_str = ""
+        pub = it.get("published_at")
+        if pub:
+            try:
+                if isinstance(pub, str):
+                    pub = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                age_hours = (now - pub.astimezone(timezone.utc)).total_seconds() / 3600
+                if age_hours < 24:
+                    age_str = f"（{int(age_hours)}小时前发布）"
+                else:
+                    age_str = f"（{int(age_hours/24)}天前发布）"
+            except Exception:
+                pass
         lines.append(
             f"[{idx}] 标题: {it['title']}\n"
             f"    来源: {it['source']}\n"
+            f"    发布时间: {age_str}\n"
             f"    内容: {it['content'][:300]}"
         )
     joined = "\n\n".join(lines)
@@ -293,7 +310,8 @@ def _build_score_prompt(batch: list[dict]) -> str:
         "6-7分=有价值的行业资讯/技术讨论/赛事预告/产业动态;\n"
         "4-5分=一般内容或超过3天旧闻;\n"
         "1-3分=关联弱或超过1周旧闻。\n"
-        "时效性权重最高，旧闻扣2-3分。领域多样性与AI核心同等重要。\n\n"
+        "⏰ 时效性是第一权重：3天前扣2分，5天前扣4分，7天以上不超过3分。\n"
+        "领域多样性与AI核心同等重要。\n\n"
         f"以JSON数组格式返回：[{{\"index\":0,\"score\":8.5}}, ...]\n\n"
         f"{joined}"
     )
@@ -301,8 +319,25 @@ def _build_score_prompt(batch: list[dict]) -> str:
 
 def _mock_score_one(item: dict) -> float:
     """Heuristic scoring when no API key is available."""
+    from datetime import datetime, timezone
     combined = (item.get("title", "") + " " + item.get("content", "")).lower()
     score = 5.0
+
+    # 时效惩罚：检查发布时间
+    pub = item.get("published_at")
+    if pub:
+        try:
+            if isinstance(pub, str):
+                pub = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+            age_hours = (datetime.now(timezone.utc) - pub.astimezone(timezone.utc)).total_seconds() / 3600
+            if age_hours > 72:   # 3天以上
+                score -= 2
+            if age_hours > 120:  # 5天以上
+                score -= 4
+            if age_hours > 168:  # 7天以上
+                score -= 6
+        except Exception:
+            pass
 
     # High-signal keywords (all domains)
     for kw in ["发布", "开源", "release", "launch", "正式", "突破",

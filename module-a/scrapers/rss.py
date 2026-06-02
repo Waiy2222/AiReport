@@ -20,6 +20,8 @@ RSS_SOURCES = [
     {"name": "solidot",        "url": "https://www.solidot.org/index.rss",    "category": "科技"},
     {"name": "leiphone",       "url": "https://www.leiphone.com/feed",         "category": "科技"},
     {"name": "techcrunch_ai",  "url": "https://techcrunch.com/category/artificial-intelligence/feed/", "category": "科技"},
+    {"name": "huggingface_blog", "url": "https://huggingface.co/blog/feed.xml", "category": "科技"},
+
 
     # ── 时事（中文）──
     {"name": "people",         "url": "http://www.people.com.cn/rss/politics.xml", "category": "时事"},

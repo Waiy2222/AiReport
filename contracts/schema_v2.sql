@@ -73,14 +73,22 @@ CREATE TABLE IF NOT EXISTS tag_catalog (
 INSERT INTO tag_catalog (tag, category, label_zh, description, sort_order) VALUES
     ('LLM',       'topic', '大模型', 'LLM/ChatGPT/Claude/Gemini等', 1),
     ('开源',      'topic', '开源项目', '开源框架、工具、模型', 2),
-    ('Python',    'topic', 'Python', 'Python生态/AI开发', 3),
-    ('AI安全',    'topic', 'AI安全', '对齐/红队/鲁棒性', 4),
-    ('Agent',     'topic', '智能体', 'AI Agent/多Agent协作', 5),
-    ('AI产品',    'topic', 'AI产品', 'AI应用/商业化/SaaS', 6),
-    ('RAG',       'topic', 'RAG', '检索增强生成', 7),
-    ('多模态',    'topic', '多模态', '视觉/语音/视频理解', 8),
-    ('AI编程',    'topic', 'AI编程', 'Copilot/IDE/代码生成', 9),
+    ('Agent',     'topic', '智能体', 'AI Agent/多Agent协作', 3),
+    ('基础设施',  'topic', '基础设施', 'GPU/推理/部署/向量数据库', 4),
+    ('多模态',    'topic', '多模态', '视觉/语音/视频理解', 5),
+    ('RAG',       'topic', 'RAG', '检索增强生成', 6),
+    ('AI编程',    'topic', 'AI编程', 'Copilot/IDE/代码生成', 7),
+    ('AI产品',    'topic', 'AI产品', 'AI应用/商业化/SaaS', 8),
+    ('AI安全',    'topic', 'AI安全', '对齐/红队/鲁棒性', 9),
     ('AI政策',    'topic', 'AI政策', '监管/合规/政策/伦理', 10),
     ('融资',      'topic', '融资并购', 'AI创投/融资/acquisition', 11),
-    ('基础设施',  'topic', '基础设施', 'GPU/推理/部署/向量数据库', 12)
+    ('Python',    'topic', 'Python', 'Python生态/AI开发', 12),
+    -- 扩展领域
+    ('科技',      'domain', '科技', '科技互联网/数码硬件', 13),
+    ('工具',      'domain', '工具', '实用工具/效率应用', 14),
+    ('体育',      'domain', '体育', '体育赛事/NBA/足球等', 15),
+    ('时事',      'domain', '时事', '国内外时事新闻', 16),
+    ('国际',      'domain', '国际', '国际关系/地缘政治', 17),
+    ('政策',      'domain', '政策', '政策法规/产业规划', 18),
+    ('安全',      'domain', '安全', '网络安全/隐私保护', 19)
 ON CONFLICT (tag) DO NOTHING;

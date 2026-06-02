@@ -140,6 +140,21 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* 灰色禁用态：无相关新闻的标签（优先级高于 selected） */
+.tag-chip.disabled {
+  background: #eeeeee !important;
+  border-color: #e0e0e0 !important;
+  opacity: 0.55;
+}
+
+.tag-chip.disabled .tag-label {
+  color: #999 !important;
+}
+
+.tag-chip.disabled .tag-desc {
+  color: #bbb !important;
+}
+
 .save-btn {
   background: #07c160;
   color: #fff;

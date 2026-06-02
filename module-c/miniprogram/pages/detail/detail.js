@@ -1,5 +1,23 @@
 const api = require("../../utils/api.js");
 const { formatFullDate } = require("../../utils/date.js");
+const app = getApp();
+
+// 按用户标签过滤简报内容
+function filterByTags(briefing, userTags) {
+  if (!userTags || userTags.length === 0) return briefing;
+  const tagSet = new Set(userTags);
+  const filteredSections = [];
+  for (const section of briefing.sections || []) {
+    const matched = (section.items || []).filter(item =>
+      (item.tags || []).some(t => tagSet.has(t))
+    );
+    if (matched.length > 0) {
+      filteredSections.push({ ...section, items: matched });
+    }
+  }
+  if (filteredSections.length === 0) return briefing;
+  return { ...briefing, sections: filteredSections };
+}
 
 Page({
   data: {
@@ -8,6 +26,7 @@ Page({
     typeText: "",
     sectionsExpanded: {},
     loading: true,
+    hasFilter: false,
   },
 
   onLoad(options) {
@@ -20,16 +39,19 @@ Page({
   async fetchDetail(id) {
     try {
       const data = await api.getBriefingDetail(id);
+      const tags = app.globalData.userTags || wx.getStorageSync("userTags") || [];
+      const filtered = filterByTags(data, tags);
       const expanded = {};
-      data.sections.forEach((s, i) => {
+      (filtered.sections || []).forEach((s, i) => {
         expanded[i] = true;
       });
       this.setData({
-        briefing: data,
+        briefing: filtered,
         dateText: formatFullDate(data.date),
         typeText: data.type === "morning" ? "早报" : "晚报",
         sectionsExpanded: expanded,
         loading: false,
+        hasFilter: tags.length > 0,
       });
     } catch (err) {
       this.setData({ loading: false });
@@ -55,5 +77,12 @@ Page({
         },
       });
     }
+  },
+
+  // 图片加载失败自动隐藏
+  onImageError(e) {
+    const { section, index } = e.currentTarget.dataset;
+    const path = `briefing.sections[${section}].items[${index}]._imgHide`;
+    this.setData({ [path]: true });
   },
 });

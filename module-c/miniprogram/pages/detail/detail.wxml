@@ -33,7 +33,7 @@
         data-index="{{i}}"
         bindtap="onSectionToggle"
       >
-        <view class="section-title">{{item.title}}</view>
+        <view class="section-title">{{item.section_title}}</view>
         <view class="section-toggle">{{sectionsExpanded[i] ? '收起' : '展开'}}</view>
       </view>
 
@@ -45,6 +45,16 @@
           class="article-card"
         >
           <view class="article-title">{{article.title}}</view>
+          <image
+            wx:if="{{article.image_url && !article._imgHide}}"
+            src="{{article.image_url}}"
+            mode="widthFix"
+            class="article-image"
+            lazy-load
+            binderror="onImageError"
+            data-section="{{i}}"
+            data-index="{{index}}"
+          />
           <view class="article-summary">{{article.summary}}</view>
           <view class="article-meta">
             <text class="tag">{{article.source}}</text>

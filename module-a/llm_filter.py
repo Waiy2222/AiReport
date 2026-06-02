@@ -107,7 +107,7 @@ def _mock_score_one(item: dict) -> float:
     source = item.get("source", "")
     category = item.get("metadata", {}).get("category", "")
 
-    # 不同领域不同起评分：AI/科技门槛高，体育/时事/国际门槛低
+    # 不同领域不同起评分：AI/科技门槛高，体育/时事/国际门槛适中
     if category == "体育" or source == "espn":
         score = 6.5  # 体育起分高，确保过线
     elif category in ("时事", "国际") or source in ("people", "bbc_zh", "voa_zh"):
@@ -172,7 +172,6 @@ def _mock_tags_one(item: dict) -> list[str]:
         tags.add("国际")
     elif category == "体育":
         tags.add("体育")
-
     # AI/Agent keywords
     for kw in ["deepseek", "openai", "gpt", "claude", "gemini", "llama", "qwen"]:
         if kw in combined:
@@ -198,6 +197,21 @@ def _mock_tags_one(item: dict) -> list[str]:
     # News/Policy keywords
     if any(kw in combined for kw in ["国务院", "外交部", "商务部", "央行", "政治局", "政策"]):
         tags.add("政策")
+
+    # Finance keywords
+    if any(kw in combined for kw in [
+        "股票", "股市", "A股", "港股", "美股", "基金", "期货", "债券",
+        "融资", "投资", "估值", "IPO", "上市", "市值", "财报",
+        "涨停", "跌停", "牛熊", "牛市", "熊市",
+        "加息", "降息", "利率", "汇率", "人民币", "美元",
+        "证券", "银行", "保险", "金融", "理财",
+        "GDP", "CPI", "PMI", "通胀", "通缩",
+        "标普", "纳斯达克", "道琼斯", "恒生", "上证", "深证",
+        "并购", "收购", "重组", "股份", "股权",
+        "stock", "nasdaq", "dow jones", "s&p", "ipo", "fund",
+        "dividend", "share", "bond", "treasury",
+    ]):
+        tags.add("财经")
 
     if source in ("bbc_zh", "voa_zh"):
         tags.add("国际")
@@ -245,7 +259,7 @@ def _build_filter_prompt(items: list[dict], rag_context: str) -> str:
         "注意：不同领域分开评判，体育/时事类不需要AI相关性也能给高分。\n\n"
         "标签从下列中选择（可多选；reason 用中文写）：\n"
         "LLM, Agent, 开源, 框架, 工具, 基础设施,\n"
-        "科技, 政策, 时事, 国际, 体育, 财经\n"
+        "科技, 政策, 时事, 国际, 体育\n"
         f"{rag_section}\n"
         "候选条目：\n"
         f"{joined}\n\n"

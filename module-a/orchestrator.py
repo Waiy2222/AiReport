@@ -1,5 +1,6 @@
 """统一调度器 — 并发执行 scraper + 去重 + 批量写入"""
 import asyncio
+import json
 import logging
 import uuid as uuid_lib
 from datetime import datetime, timezone
@@ -77,51 +78,42 @@ def dedup_by_url(items: list[dict]) -> list[dict]:
 
 
 async def bulk_insert(pool: asyncpg.Pool, items: list[dict]) -> int:
-    """批量插入 raw_items 表，用 ON CONFLICT 防重复，支持 embedding 列"""
+    """批量插入 raw_items 表，用 ON CONFLICT 防重复（无 embedding 列，因 pgvector 未安装）"""
     if not items:
         return 0
 
-    rows = [
-        (
-            item["source"],
-            item["title"],
-            item["url"],
-            item.get("content", ""),
-            item.get("author", ""),
-            item["published_at"],
-            item["batch_id"],
-            item.get("metadata", {}),
-            item.get("embedding"),
-        )
-        for item in items
-    ]
-
-    # 格式化 embedding 为 pgvector 字符串（NULL 保持 None）
-    formatted_rows = []
-    for row in rows:
-        *rest, embedding = row
-        if embedding is not None:
-            embedding_str = f"[{','.join(str(x) for x in embedding)}]"
-        else:
-            embedding_str = None
-        formatted_rows.append(tuple(rest) + (embedding_str,))
-
+    now = datetime.now(timezone.utc)
+    count = 0
     async with pool.acquire() as conn:
-        result = await conn.executemany(
-            """
-            INSERT INTO raw_items (source, title, url, content, author, published_at, batch_id, metadata, embedding)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector)
-            ON CONFLICT (url) DO UPDATE SET
-                batch_id = EXCLUDED.batch_id,
-                metadata = EXCLUDED.metadata,
-                embedding = EXCLUDED.embedding
-            """,
-            formatted_rows,
-        )
-    if result is None:
-        return 0
-    inserted = sum(1 for part in result.split("INSERT") if "0 1" in part)
-    return inserted
+        async with conn.transaction():
+            for item in items:
+                try:
+                    result = await conn.fetchval(
+                        """
+                        INSERT INTO raw_items
+                            (source, title, url, content, author,
+                             published_at, fetched_at, metadata, batch_id)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+                        ON CONFLICT (url) DO UPDATE SET
+                            batch_id = EXCLUDED.batch_id,
+                            metadata = EXCLUDED.metadata
+                        RETURNING id
+                        """,
+                        item["source"],
+                        item["title"],
+                        item["url"],
+                        item.get("content", ""),
+                        item.get("author", ""),
+                        item["published_at"],
+                        now,
+                        json.dumps(item.get("metadata", {})),
+                        item["batch_id"],
+                    )
+                    if result is not None:
+                        count += 1
+                except Exception:
+                    logger.debug("Skipping malformed item in bulk_insert", exc_info=True)
+    return count
 
 
 async def run_pipeline(

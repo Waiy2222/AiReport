@@ -65,6 +65,7 @@ async function loadAll() {
     if (hAll) renderModuleHealth(hAll, ov?.modules);
     if (us)  renderUserStats(us);
     if (vs)  renderVideos(vs);
+    refreshTagStates();
     if (!ov && !sch && !st && !hAll) showToast("error", "无法连接后端，请确认服务运行在 " + API_BASE);
   } catch (e) {
     console.error("loadAll error:", e);
@@ -109,8 +110,8 @@ function renderModuleHealth(healthAll, overviewModules) {
 // ---------- Render Overview (briefings) ----------
 function renderOverview(ov) {
   const container = document.getElementById("briefingCards");
-  // preview 在 module-b (8002) 或 nginx (80)，用 nginx 透传
-  const previewBase = `${window.location.protocol}//${window.location.hostname}/preview/`;
+  // preview 通过当前服务器代理到 module-b
+  const previewBase = `${window.location.origin}/preview/`;
   let html = "";
   ["morning", "evening"].forEach((type) => {
     const d = ov[type] || {};
@@ -465,6 +466,39 @@ function showToast(type, message) {
     toast.style.transition = "opacity 0.3s";
     setTimeout(() => toast.remove(), 300);
   }, 4000);
+}
+
+// ---------- 标签可用性刷新 ----------
+async function refreshTagStates() {
+  try {
+    const [morning, evening] = await Promise.allSettled([
+      apiGet("/api/briefings/latest?type=morning"),
+      apiGet("/api/briefings/latest?type=evening"),
+    ]);
+    const activeTags = new Set();
+    [morning, evening].forEach(r => {
+      if (r.status !== "fulfilled" || !r.value) return;
+      (r.value.sections || []).forEach(sec =>
+        (sec.items || []).forEach(item =>
+          (item.tags || []).forEach(t => activeTags.add(t))
+        )
+      );
+    });
+
+    document.querySelectorAll("#tagSelector input[type=checkbox]").forEach(cb => {
+      const hasNews = activeTags.has(cb.value);
+      cb.parentElement.classList.toggle("tag-disabled", !hasNews);
+      // 无新闻 → 取消勾选 + 禁用
+      if (!hasNews) {
+        cb.checked = false;
+        cb.disabled = true;
+      } else {
+        cb.disabled = false;
+      }
+    });
+  } catch (e) {
+    console.warn("refreshTagStates error:", e);
+  }
 }
 
 // ---------- Helpers ----------

@@ -1,6 +1,7 @@
 App({
   globalData: {
     openid: "",
+    userTags: [],
     baseUrl: "http://localhost:8003",
   },
 

@@ -1,7 +1,10 @@
 """摘要 + 标签生成 — 生成结构化简报内容（V2：含 headline + image_keywords）"""
 import json
+import logging
 from .client import get_client, DEEPSEEK_MODEL
 from .prompts import get_summary_system, summary_user
+
+logger = logging.getLogger(__name__)
 
 
 async def summarize(items: list[dict], briefing_type: str) -> dict:
@@ -42,6 +45,7 @@ async def summarize(items: list[dict], briefing_type: str) -> dict:
             "key_takeaways": result.get("key_takeaways", []),
         }
     except Exception as e:
+        logger.error("Summarize LLM call failed: %s", e, exc_info=True)
         return {
             "headline": {},
             "tl_dr": [f"处理异常: {e}"],

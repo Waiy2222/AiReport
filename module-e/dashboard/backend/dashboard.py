@@ -20,12 +20,14 @@ def _get_pool_or_503():
     except RuntimeError:
         raise HTTPException(503, "database not initialized")
 
+import os
+
 MODULE_HEALTH_URLS = {
-    "A": "http://module-a:8001/health",
-    "B": "http://module-b:8002/health",
-    "C": "http://module-c:8003/health",
-    "D": "http://module-d:8004/health",
-    "F": "http://module-f:8006/health",
+    "A": os.getenv("A_HEALTH_URL", "http://localhost:8001/health"),
+    "B": os.getenv("B_HEALTH_URL", "http://localhost:8002/health"),
+    "C": os.getenv("C_HEALTH_URL", "http://localhost:8003/health"),
+    "D": os.getenv("D_HEALTH_URL", "http://localhost:8004/health"),
+    "F": os.getenv("F_HEALTH_URL", "http://localhost:8006/health"),
 }
 
 

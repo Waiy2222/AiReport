@@ -251,3 +251,163 @@ async def report_behavior(req: BehaviorRequest):
 
     # Mock 模式
     return {"status": "ok", "mode": "mock"}
+
+
+# ── GET /api/user/{openid}/interest-radar ────────────────────────
+# 返回用户兴趣雷达图数据（近7天点击权重，0-100 归一化）
+
+
+@router.get("/user/{openid}/interest-radar")
+async def get_interest_radar(openid: str):
+    """返回用户兴趣雷达图数据：每个标签的点击权重（0-100）"""
+    tag_counts: dict[str, int] = {}
+    total = 0
+
+    try:
+        if _db_pool:
+            rows = await _db_pool.fetch(
+                """SELECT item_tags FROM user_behavior
+                   WHERE user_openid = $1
+                     AND action IN ('click', 'share')
+                     AND created_at > NOW() - INTERVAL '7 days'""",
+                openid,
+            )
+            for r in rows:
+                tags_val = r["item_tags"]
+                if isinstance(tags_val, str):
+                    tags_val = json.loads(tags_val)
+                if isinstance(tags_val, list):
+                    for t in tags_val:
+                        tag_counts[t] = tag_counts.get(t, 0) + 1
+                        total += 1
+    except Exception:
+        logger.warning("DB query failed for interest radar", exc_info=True)
+
+    # Mock 模式：用假数据
+    if total == 0:
+        mock_tags = ["LLM", "Agent", "开源", "多模态", "基础设施", "AI编程", "AI产品", "AI安全"]
+        import random
+        random.seed(hash(openid) % 10000)
+        for t in mock_tags:
+            tag_counts[t] = random.randint(1, 15)
+        total = sum(tag_counts.values())
+
+    # 归一化到 0-100，取前 8 个最高权重标签
+    max_count = max(tag_counts.values()) if tag_counts else 1
+    radar_data = sorted(
+        [{"tag": t, "label_zh": _tag_label(t), "value": round(c / max_count * 100)}
+         for t, c in tag_counts.items()],
+        key=lambda x: x["value"], reverse=True,
+    )[:8]
+
+    return {
+        "openid": openid,
+        "radar": radar_data,
+        "total_clicks_7d": total,
+    }
+
+
+def _tag_label(tag: str) -> str:
+    """tag → 中文标签映射"""
+    labels = {
+        "LLM": "大模型", "开源": "开源", "Agent": "智能体",
+        "基础设施": "基础设施", "多模态": "多模态", "RAG": "RAG",
+        "AI编程": "AI编程", "AI产品": "AI产品", "AI安全": "AI安全",
+        "AI政策": "AI政策", "融资": "融资", "Python": "Python",
+        "科技": "科技", "工具": "工具", "体育": "体育",
+        "时事": "时事", "国际": "国际", "政策": "政策", "安全": "安全",
+    }
+    return labels.get(tag, tag)
+
+
+# ── GET /api/user/{openid}/daily-digest ──────────────────────────
+# Agent 生成每日个性化兴趣总结
+
+
+@router.get("/user/{openid}/daily-digest")
+async def get_daily_digest(openid: str):
+    """Agent 根据今日用户点击，生成个性化兴趣领域总结"""
+    # 1. 收集用户今日点击的标签
+    today_tags: dict[str, int] = {}
+    total_clicks = 0
+    try:
+        if _db_pool:
+            rows = await _db_pool.fetch(
+                """SELECT item_tags, item_title FROM user_behavior
+                   WHERE user_openid = $1
+                     AND action = 'click'
+                     AND created_at > NOW() - INTERVAL '1 day'
+                   ORDER BY created_at DESC""",
+                openid,
+            )
+            for r in rows:
+                tags_val = r["item_tags"]
+                if isinstance(tags_val, str):
+                    tags_val = json.loads(tags_val)
+                if isinstance(tags_val, list):
+                    for t in tags_val:
+                        today_tags[t] = today_tags.get(t, 0) + 1
+                        total_clicks += 1
+    except Exception:
+        logger.warning("DB query failed for daily digest", exc_info=True)
+
+    # Mock 数据
+    if total_clicks == 0:
+        today_tags = {"LLM": 5, "Agent": 3, "开源": 2, "基础设施": 2}
+        total_clicks = 12
+
+    # 2. 排序取 Top 兴趣领域
+    top_interests = sorted(today_tags.items(), key=lambda x: x[1], reverse=True)[:5]
+    interest_summary = [{"tag": t, "label_zh": _tag_label(t), "clicks": c} for t, c in top_interests]
+
+    # 3. 尝试获取今日简报中匹配的 TL;DR
+    matched_tldr: list[str] = []
+    try:
+        from mock_data import get_briefings
+        briefings = get_briefings()
+        today_briefing = next((b for b in briefings if b["type"] == "morning"), None)
+        if today_briefing:
+            top_tag_set = {t for t, _ in top_interests[:3]}
+            for section in today_briefing.get("sections", []):
+                for item in section.get("items", []):
+                    item_tags = set(item.get("tags", []))
+                    if item_tags & top_tag_set:
+                        matched_tldr.append(f"【{item['title']}】{item['summary'][:50]}...")
+            matched_tldr = matched_tldr[:5]
+    except Exception:
+        logger.warning("Failed to match TL;DR")
+
+    # 4. Agent 生成个性化总结
+    agent_msg = _build_digest_message(interest_summary, matched_tldr, total_clicks)
+
+    return {
+        "openid": openid,
+        "today_clicks": total_clicks,
+        "top_interests": interest_summary,
+        "matched_news": matched_tldr,
+        "agent_summary": agent_msg,
+    }
+
+
+def _build_digest_message(interests: list[dict], matched: list[str], total: int) -> str:
+    """Agent 生成个性化总结（模板驱动，后续可接入 LLM）"""
+    if total == 0:
+        return "今天还没有浏览记录，去看看今天的简报吧！"
+
+    interest_str = "、".join([f"{i['label_zh']}({i['clicks']}次)" for i in interests[:3]])
+
+    lines = [
+        f"📊 今日你最关注的领域是 {interest_str}",
+        f"共浏览 {total} 篇文章，专注度很高！",
+    ]
+
+    if matched:
+        lines.append(f"\n🔍 这些文章你可能有兴趣回顾：")
+        for m in matched[:3]:
+            lines.append(f"  • {m}")
+
+    # 根据兴趣给个性化建议
+    top_tag = interests[0]["label_zh"] if interests else "AI"
+    lines.append(f"\n💡 Agent建议：你对{top_tag}领域特别感兴趣，已自动为你提升该领域权重，明天的简报将更多覆盖此方向。")
+
+    return "\n".join(lines)

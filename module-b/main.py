@@ -1,4 +1,8 @@
 """Module B — AI 内容加工 (:8002)"""
+import os, sys
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
 import json
 import uuid
 from datetime import date

@@ -1,5 +1,8 @@
 """Module E — 调度管理与 Dashboard (:8005)"""
-import os
+import os, sys
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
 import json
 import logging
 from datetime import date
@@ -7,7 +10,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -264,6 +269,24 @@ async def schedule_status():
 # ---------- Dashboard Router ----------
 from dashboard.backend.dashboard import router as dashboard_router
 app.include_router(dashboard_router)
+
+
+# ---------- Proxy to module-b (preview / longimage) ----------
+B_PROXY_URL = os.getenv("B_URL", "http://module-b:8002/run-b").replace("/run-b", "")
+
+@app.get("/preview/{briefing_id}")
+async def proxy_preview(briefing_id: str):
+    """Forward preview requests to module-b so browser only needs port 8005."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(f"{B_PROXY_URL}/preview/{briefing_id}")
+        return Response(content=r.text, media_type="text/html")
+
+@app.get("/longimage/{briefing_id}")
+async def proxy_longimage(briefing_id: str):
+    """Forward longimage requests to module-b."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.get(f"{B_PROXY_URL}/longimage/{briefing_id}")
+        return Response(content=r.content, media_type=r.headers.get("content-type", "image/png"))
 
 # ---------- Static file serving for dashboard frontend ----------
 _frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard", "frontend", "src", "pages")

@@ -34,25 +34,31 @@ Page({
       const tagsResp = await api.getTags();
       const catalogTags = tagsResp.tags || [];
 
-      let selectedTags = [];
+      let savedTags = [];
       try {
         const prefs = await api.getPreferences(this.data.openid);
-        selectedTags = prefs.tags || [];
+        savedTags = prefs.tags || [];
       } catch (e) {
         console.warn("获取偏好失败", e);
       }
 
       // 从全局读取首页已缓存的活跃标签（首页加载简报时自动收集）
       const activeTagSet = app.globalData.activeTagSet || {};
+      const hasActiveData = Object.keys(activeTagSet).length > 0;
+
+      // 剔除已失效的标签（之前选了但现在无新闻）
+      const validSelected = hasActiveData
+        ? savedTags.filter(t => activeTagSet[t])
+        : savedTags;
 
       const allTags = catalogTags.map((t) => ({
         ...t,
-        selected: selectedTags.indexOf(t.tag) >= 0,
-        disabled: Object.keys(activeTagSet).length > 0 && !activeTagSet[t.tag],
-        hasNews: Object.keys(activeTagSet).length === 0 || !!activeTagSet[t.tag],
+        selected: validSelected.indexOf(t.tag) >= 0,
+        disabled: hasActiveData && !activeTagSet[t.tag],
+        hasNews: !hasActiveData || !!activeTagSet[t.tag],
       }));
 
-      this.setData({ allTags, selectedTags, loadingTags: false });
+      this.setData({ allTags, selectedTags: validSelected, loadingTags: false });
     } catch (e) {
       console.error("加载标签失败", e);
       this.setData({ loadingTags: false });

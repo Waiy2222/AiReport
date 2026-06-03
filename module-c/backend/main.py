@@ -41,6 +41,10 @@ _db_ok = False
 from tags import router as tags_router, set_db_pool as set_tags_db_pool
 app.include_router(tags_router)
 
+# 注册 Phase 3 趋势路由
+from trends import router as trends_router, set_db_pool as set_trends_db_pool
+app.include_router(trends_router)
+
 
 @app.on_event("startup")
 async def startup():
@@ -52,6 +56,7 @@ async def startup():
             await conn.fetchval("SELECT 1")
         _db_ok = True
         set_tags_db_pool(pool)
+        set_trends_db_pool(pool)
         print("[module-c] PostgreSQL connected")
     except Exception:
         _db_ok = False

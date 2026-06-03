@@ -107,13 +107,18 @@ async def get_latest(type: str = Query(..., description="morning or evening")):
         )
         if not row:
             raise HTTPException(404, "no briefing found")
+        raw_stats = row["raw_stats"] or {}
+        if isinstance(raw_stats, str):
+            raw_stats = json.loads(raw_stats)
         return {
             "id": str(row["id"]),
             "type": row["type"],
             "date": str(row["date"]),
+            "headline": raw_stats.get("headline", {}),
             "tl_dr": row["tl_dr"],
             "sections": row["sections"],
             "key_takeaways": row["key_takeaways"],
+            "raw_stats": raw_stats,
             "generated_at": row["generated_at"].isoformat(),
         }
     except RuntimeError:

@@ -8,6 +8,11 @@ BRIEFINGS = [
         "type": "morning",
         "date": "2026-05-24",
         "language": "zh",
+        "headline": {
+            "title": "DeepSeek-V4引爆开源革命：370B参数训练成本仅$5M",
+            "summary": "MoE架构+MIT协议，多项基准达GPT-5同级，HN社区24小时内2万+评论",
+            "item_index": 0,
+        },
         "tl_dr": [
             "DeepSeek-V4技术报告引发全球关注，MoE架构370B参数开源，训练成本仅500万美元",
             "Meta开源Llama-4-R1推理增强模型，MIT许可证，多项基准达GPT-5同级",
@@ -104,7 +109,15 @@ BRIEFINGS = [
             "AI工具链基础设施加速成熟，vLLM/ChromaDB/RAGFlow密集发布大版本",
             "欧盟AI监管正式落地，合规成本将成为AI企业重要考量",
         ],
-        "raw_stats": {"fetched": 30, "scored": 30, "passed": 14, "dedup_removed": 2},
+        "raw_stats": {
+            "fetched": 98,
+            "scored": 98,
+            "passed": 45,
+            "dedup_url_removed": 8,
+            "dedup_semantic_removed": 15,
+            "final_count": 17,
+            "headline": {"title": "Meta开源Llama-4-R1推理增强模型", "summary": "GPT-5同级+MIT许可证，开源社区沸腾", "item_index": 0},
+        },
         "generated_at": "2026-05-24T08:00:00+00:00",
     },
     {
@@ -112,6 +125,11 @@ BRIEFINGS = [
         "type": "morning",
         "date": "2026-05-23",
         "language": "zh",
+        "headline": {
+            "title": "Anthropic发布Claude Opus 4.6，Agent能力跃升",
+            "summary": "SWE-Bench Verified 85%，多Agent协作能力显著增强",
+            "item_index": 0,
+        },
         "tl_dr": [
             "Anthropic Claude Opus 4.6发布，Agent能力显著提升",
             "LangChain发布多Agent协作框架",
@@ -135,7 +153,15 @@ BRIEFINGS = [
             }
         ],
         "key_takeaways": ["Agent能力成为大模型核心竞争力"],
-        "raw_stats": {"fetched": 28, "scored": 28, "passed": 12},
+        "raw_stats": {
+            "fetched": 85,
+            "scored": 85,
+            "passed": 38,
+            "dedup_url_removed": 6,
+            "dedup_semantic_removed": 11,
+            "final_count": 14,
+            "headline": {"title": "Claude Opus 4.6发布", "summary": "Agent能力显著提升", "item_index": 0},
+        },
         "generated_at": "2026-05-23T08:00:00+00:00",
     },
     {
@@ -143,6 +169,11 @@ BRIEFINGS = [
         "type": "evening",
         "date": "2026-05-23",
         "language": "zh",
+        "headline": {
+            "title": "Dify v1.5多Agent工作流上线，低代码构建AI应用",
+            "summary": "新增RAG管道可视化编排，企业级部署能力大幅提升",
+            "item_index": 0,
+        },
         "tl_dr": [
             "Dify v1.5多Agent工作流上线",
             "PromptFlow开源引发LLM工具链讨论",
@@ -166,7 +197,15 @@ BRIEFINGS = [
             }
         ],
         "key_takeaways": ["AI开发工具链日趋成熟，低代码Agent构建成为趋势"],
-        "raw_stats": {"fetched": 25, "scored": 25, "passed": 10},
+        "raw_stats": {
+            "fetched": 72,
+            "scored": 72,
+            "passed": 31,
+            "dedup_url_removed": 5,
+            "dedup_semantic_removed": 9,
+            "final_count": 11,
+            "headline": {"title": "Dify v1.5多Agent工作流上线", "summary": "低代码Agent构建成为趋势", "item_index": 0},
+        },
         "generated_at": "2026-05-23T20:00:00+00:00",
     },
 ]

@@ -30,6 +30,30 @@
     </view>
   </view>
 
+  <!-- Phase 3: 信源健康度 -->
+  <view class="settings-block">
+    <view class="settings-title">
+      信源健康度
+      <view class="health-pending-badge" wx:if="{{pendingRecommendations > 0}}">
+        🔔 {{pendingRecommendations}}个新信源待审核
+      </view>
+    </view>
+    <view class="health-list">
+      <view
+        class="health-item"
+        wx:for="{{sourceHealth}}"
+        wx:key="tag"
+      >
+        <view class="health-dot {{item.health}}"></view>
+        <view class="health-tag">{{item.label_zh || item.tag}}</view>
+        <view class="health-count">{{item.count}}条</view>
+      </view>
+    </view>
+    <view class="health-hint" wx:if="{{sourceHealth.length === 0}}">
+      加载中...
+    </view>
+  </view>
+
   <!-- 订阅设置 -->
   <view class="settings-block">
     <view class="settings-title">推送订阅</view>

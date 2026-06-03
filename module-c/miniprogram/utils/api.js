@@ -70,4 +70,17 @@ module.exports = {
   reportBehavior(data) {
     return request("/api/behavior", "POST", data);
   },
+
+  // Phase 3 新增: 信源健康度 API
+  getSourcesHealth() {
+    return request("/api/sources/health");
+  },
+
+  getSourcesRecommendations(status = "pending") {
+    return request(`/api/sources/recommendations?status=${encodeURIComponent(status)}`);
+  },
+
+  approveSource(sourceId) {
+    return request(`/api/sources/approve?source_id=${encodeURIComponent(sourceId)}`, "POST");
+  },
 };

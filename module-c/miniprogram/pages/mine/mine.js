@@ -10,6 +10,9 @@ Page({
     allTags: [],
     selectedTags: [],
     loadingTags: true,
+    // Phase 3: 信源健康度
+    sourceHealth: [],
+    pendingRecommendations: 0,
   },
 
   onLoad() {
@@ -21,11 +24,13 @@ Page({
       openidMasked: openid.substring(0, 8) + "***" + openid.slice(-4),
     });
     this.loadTagsAndPreferences();
+    this.loadSourcesHealth();
   },
 
   onShow() {
     if (this.data.openid) {
       this.loadTagsAndPreferences();
+      this.loadSourcesHealth();
     }
   },
 
@@ -122,6 +127,22 @@ Page({
       wx.showToast({ title: "已保存", icon: "success" });
     } catch (err) {
       wx.showToast({ title: "保存失败", icon: "none" });
+    }
+  },
+
+  // Phase 3: 加载信源健康度
+  async loadSourcesHealth() {
+    try {
+      const resp = await api.getSourcesHealth();
+      const items = resp.items || [];
+      const pending = items.reduce(
+        (sum, item) => sum + (item.recommendations_pending || 0),
+        0,
+      );
+      this.setData({ sourceHealth: items, pendingRecommendations: pending });
+    } catch (e) {
+      console.warn("加载信源健康度失败", e);
+      // 静默失败，不影响主功能
     }
   },
 

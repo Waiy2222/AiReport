@@ -1,6 +1,7 @@
 """Module C — 微信小程序+公众号后端 (:8003)
 
 Phase 2 更新：新增公众号回调、标签管理、用户行为追踪、个性化推送。
+Phase 3 更新：新增 Agent 自主扩展信源 API（信源健康度 / 推荐列表 / 审核）。
 无 PostgreSQL 时自动使用内置假数据，无需任何外部依赖即可运行。
 """
 import json
@@ -13,6 +14,23 @@ from fastapi.staticfiles import StaticFiles
 from db import get_pool, init_db, close_db
 from models import SubscribeRequest, UnsubscribeRequest, PushRequest
 from mock_data import get_briefings, get_subscriptions
+
+# Phase 3: 引入 source_agent（module-a），用于信源健康度 API
+_source_agent = None
+try:
+    import importlib.util
+
+    _agent_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "module-a",
+        "source_agent.py",
+    )
+    if os.path.exists(_agent_path):
+        _spec = importlib.util.spec_from_file_location("source_agent", _agent_path)
+        _source_agent = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_source_agent)
+except Exception:
+    _source_agent = None
 
 app = FastAPI(title="Module C - WeChat Mini Program + OA Backend")
 
@@ -362,7 +380,7 @@ async def push(req: PushRequest):
         or (btype == "evening" and t.get("evening_enabled", True))
     ]
 
-    if not os.getenv("WX_APPID"):
+    if not os.getenv("WECHAT_APPID"):
         return {
             "status": "dry_run",
             "briefing_id": str(briefing["id"]),
@@ -377,3 +395,239 @@ async def push(req: PushRequest):
     from push import batch_push
     result = await batch_push(briefing, targets)
     return result
+
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 3: Agent 信源健康度 API
+# ══════════════════════════════════════════════════════════════════
+
+
+@app.get("/api/sources/health")
+async def get_sources_health():
+    """返回各标签覆盖率（绿/黄/红三档）"""
+    try:
+        pool = _db()
+    except RuntimeError:
+        return _mock_sources_health()
+
+    if _source_agent is not None:
+        return {"items": await _source_agent.get_sources_health(pool)}
+
+    # 回退：直接 SQL 查询
+    from datetime import date, timedelta
+
+    cutoff = date.today() - timedelta(days=3)
+    tags = await pool.fetch(
+        "SELECT tag, label_zh FROM tag_catalog ORDER BY sort_order"
+    )
+    items = []
+    for row in tags:
+        tag = row["tag"]
+        count = await pool.fetchval(
+            """SELECT COUNT(*) FROM raw_items
+               WHERE fetched_at >= $1 AND metadata->'tags' ? $2""",
+            cutoff,
+            tag,
+        )
+        if count >= 5:
+            health = "green"
+        elif count >= 2:
+            health = "yellow"
+        else:
+            health = "red"
+
+        pending = await pool.fetchval(
+            "SELECT COUNT(*) FROM recommended_sources WHERE tag=$1 AND status='pending'",
+            tag,
+        )
+
+        items.append(
+            {
+                "tag": tag,
+                "label_zh": row["label_zh"] or tag,
+                "count": count,
+                "health": health,
+                "coverage_threshold": 2,
+                "coverage_days": 3,
+                "recommendations_pending": pending or 0,
+            }
+        )
+    return {"items": items}
+
+
+def _mock_sources_health():
+    """无 DB 时的 mock 信源健康度"""
+    mock_tags = [
+        {"tag": "LLM", "label_zh": "大模型", "count": 12, "health": "green"},
+        {"tag": "开源", "label_zh": "开源项目", "count": 8, "health": "green"},
+        {"tag": "Agent", "label_zh": "智能体", "count": 6, "health": "green"},
+        {"tag": "基础设施", "label_zh": "基础设施", "count": 4, "health": "yellow"},
+        {"tag": "RAG", "label_zh": "RAG", "count": 1, "health": "red"},
+        {"tag": "多模态", "label_zh": "多模态", "count": 5, "health": "green"},
+        {"tag": "AI编程", "label_zh": "AI编程", "count": 7, "health": "green"},
+        {"tag": "AI产品", "label_zh": "AI产品", "count": 3, "health": "yellow"},
+        {"tag": "AI安全", "label_zh": "AI安全", "count": 1, "health": "red"},
+        {"tag": "AI政策", "label_zh": "AI政策", "count": 2, "health": "yellow"},
+        {"tag": "融资", "label_zh": "融资并购", "count": 5, "health": "green"},
+        {"tag": "Python", "label_zh": "Python", "count": 9, "health": "green"},
+        {"tag": "科技", "label_zh": "科技", "count": 10, "health": "green"},
+        {"tag": "体育", "label_zh": "体育", "count": 6, "health": "green"},
+        {"tag": "时事", "label_zh": "时事", "count": 8, "health": "green"},
+    ]
+    for t in mock_tags:
+        t.setdefault("coverage_threshold", 2)
+        t.setdefault("coverage_days", 3)
+        t.setdefault("recommendations_pending", 0)
+    # 给红色标签加 mock pending
+    for t in mock_tags:
+        if t["health"] == "red":
+            t["recommendations_pending"] = 2 if t["tag"] == "RAG" else 1
+    return {"items": mock_tags}
+
+
+@app.get("/api/sources/recommendations")
+async def get_sources_recommendations(
+    status: str = Query("pending", description="pending | approved | rejected"),
+):
+    """返回待审/已处理推荐信源列表"""
+    try:
+        pool = _db()
+    except RuntimeError:
+        return {"items": _mock_recommendations(status)}
+
+    if _source_agent is not None:
+        items = await _source_agent.get_recommendations(pool, status)
+        return {"items": items}
+
+    # 回退：直接 SQL 查询
+    rows = await pool.fetch(
+        """SELECT r.*, tc.label_zh AS tag_label
+           FROM recommended_sources r
+           LEFT JOIN tag_catalog tc ON r.tag = tc.tag
+           WHERE r.status = $1
+           ORDER BY r.quality_score DESC, r.discovered_at DESC""",
+        status,
+    )
+    items = []
+    for r in rows:
+        items.append(
+            {
+                "id": str(r["id"]),
+                "tag": r["tag"],
+                "tag_label": r["tag_label"],
+                "name": r["name"],
+                "url": r["url"],
+                "rss_url": r["rss_url"],
+                "quality_score": float(r["quality_score"]) if r["quality_score"] else None,
+                "relevance_score": float(r["relevance_score"]) if r["relevance_score"] else None,
+                "freshness_score": float(r["freshness_score"]) if r["freshness_score"] else None,
+                "authority_score": float(r["authority_score"]) if r["authority_score"] else None,
+                "status": r["status"],
+                "discovered_at": r["discovered_at"].isoformat() if r["discovered_at"] else None,
+                "approved_at": r["approved_at"].isoformat() if r["approved_at"] else None,
+            }
+        )
+    return {"items": items}
+
+
+def _mock_recommendations(status: str) -> list[dict]:
+    """无 DB 时的 mock 推荐数据"""
+    if status != "pending":
+        return []
+    return [
+        {
+            "id": "mock-rec-001",
+            "tag": "RAG",
+            "tag_label": "RAG",
+            "name": "LlamaIndex Blog",
+            "url": "https://blog.llamaindex.ai",
+            "rss_url": "https://blog.llamaindex.ai/feed",
+            "quality_score": 4.3,
+            "relevance_score": 5,
+            "freshness_score": 4,
+            "authority_score": 4,
+            "status": "pending",
+            "discovered_at": "2026-06-03T10:00:00+08:00",
+            "approved_at": None,
+        },
+        {
+            "id": "mock-rec-002",
+            "tag": "RAG",
+            "tag_label": "RAG",
+            "name": "RAG Research Papers (Arxiv)",
+            "url": "https://arxiv.org/list/cs.IR/recent",
+            "rss_url": "https://rss.arxiv.org/rss/cs.IR",
+            "quality_score": 3.8,
+            "relevance_score": 4,
+            "freshness_score": 5,
+            "authority_score": 3,
+            "status": "pending",
+            "discovered_at": "2026-06-03T10:00:00+08:00",
+            "approved_at": None,
+        },
+        {
+            "id": "mock-rec-003",
+            "tag": "AI安全",
+            "tag_label": "AI安全",
+            "name": "AI Safety Blog (Anthropic)",
+            "url": "https://www.anthropic.com/research",
+            "rss_url": None,
+            "quality_score": 4.5,
+            "relevance_score": 5,
+            "freshness_score": 4,
+            "authority_score": 5,
+            "status": "pending",
+            "discovered_at": "2026-06-03T10:00:00+08:00",
+            "approved_at": None,
+        },
+    ]
+
+
+@app.post("/api/sources/approve")
+async def approve_source(source_id: str = Query(..., description="推荐信源 ID")):
+    """管理员通过推荐信源（将 status 改为 approved）"""
+    try:
+        UUID(source_id)
+    except ValueError:
+        raise HTTPException(400, "invalid source id format")
+
+    try:
+        pool = _db()
+    except RuntimeError:
+        # Mock 模式：返回模拟结果
+        return {
+            "status": "ok",
+            "source_id": source_id,
+            "message": "信源已通过（mock 模式）",
+        }
+
+    if _source_agent is not None:
+        result = await _source_agent.approve_source(pool, source_id)
+        if result is None:
+            raise HTTPException(404, "source not found or already processed")
+        return {"status": "ok", "source": result}
+
+    # 回退：直接 SQL
+    row = await pool.fetchrow(
+        """UPDATE recommended_sources
+           SET status = 'approved', approved_at = now()
+           WHERE id = $1 AND status = 'pending'
+           RETURNING *""",
+        UUID(source_id),
+    )
+    if row is None:
+        raise HTTPException(404, "source not found or already processed")
+
+    return {
+        "status": "ok",
+        "source": {
+            "id": str(row["id"]),
+            "tag": row["tag"],
+            "name": row["name"],
+            "url": row["url"],
+            "rss_url": row["rss_url"],
+            "quality_score": float(row["quality_score"]) if row["quality_score"] else None,
+            "status": row["status"],
+            "approved_at": row["approved_at"].isoformat() if row["approved_at"] else None,
+        },
+    }

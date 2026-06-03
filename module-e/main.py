@@ -266,6 +266,46 @@ async def schedule_status():
     }
 
 
+# ---------- Proxy to module-c (source health / recommendations) ----------
+C_URL = os.getenv("C_URL", "http://module-c:8003")
+
+
+@app.get("/api/sources/health")
+async def proxy_sources_health():
+    """Forward source health requests to module-c."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(f"{C_URL}/api/sources/health")
+        return r.json()
+
+
+@app.get("/api/sources/recommendations")
+async def proxy_sources_recommendations(
+    status: str = Query("pending", description="pending | approved | rejected"),
+):
+    """Forward source recommendations requests to module-c."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(
+            f"{C_URL}/api/sources/recommendations",
+            params={"status": status},
+        )
+        return r.json()
+
+
+@app.post("/api/sources/approve")
+async def proxy_sources_approve(
+    source_id: str = Query(..., description="推荐信源 ID"),
+):
+    """Forward source approval requests to module-c."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{C_URL}/api/sources/approve",
+            params={"source_id": source_id},
+        )
+        if r.status_code >= 400:
+            raise HTTPException(r.status_code, r.text)
+        return r.json()
+
+
 # ---------- Dashboard Router ----------
 from dashboard.backend.dashboard import router as dashboard_router
 app.include_router(dashboard_router)

@@ -52,6 +52,8 @@ async function loadAll() {
       apiGet("/api/dashboard/users/stats"),
       apiGet("/api/dashboard/videos"),
     ]);
+    // Load source health separately (not critical for main flow)
+    loadSourcesHealth();
     const ov   = overview.status   === "fulfilled" ? overview.value   : null;
     const sch  = schedule.status   === "fulfilled" ? schedule.value   : null;
     const st   = stats.status      === "fulfilled" ? stats.value      : null;
@@ -501,6 +503,127 @@ async function refreshTagStates() {
   }
 }
 
+// ---------- Source Health & Recommendations ----------
+async function loadSourcesHealth() {
+  try {
+    const [healthResp, recsResp] = await Promise.allSettled([
+      apiGet("/api/sources/health"),
+      apiGet("/api/sources/recommendations?status=pending"),
+    ]);
+    const health = healthResp.status === "fulfilled" ? healthResp.value : null;
+    const recs = recsResp.status === "fulfilled" ? recsResp.value : null;
+    renderSourcesHealth(health, recs);
+  } catch (e) {
+    console.error("loadSourcesHealth error:", e);
+  }
+}
+
+function renderSourcesHealth(healthData, recsData) {
+  const container = document.getElementById("sourcesContent");
+  const items = healthData?.items || [];
+  const recs = recsData?.items || [];
+  const totalPending = recs.length;
+
+  // Build health grid
+  let healthGridHtml = "";
+  items.forEach((item) => {
+    const pendingBadge = item.recommendations_pending > 0
+      ? `<span class="source-health-pending">+${item.recommendations_pending}</span>`
+      : "";
+    healthGridHtml += `
+      <div class="source-health-item">
+        <span class="source-health-dot ${item.health}"></span>
+        <span class="source-health-tag">${item.label_zh || item.tag}</span>
+        ${pendingBadge}
+        <span class="source-health-count">${item.count}条</span>
+      </div>`;
+  });
+
+  // Build recommendations table
+  let recsHtml = "";
+  if (recs.length > 0) {
+    recsHtml = `
+      <div class="source-recs-header">
+        待审核推荐信源
+        <span class="badge badge-pending">${totalPending}个</span>
+      </div>
+      <div class="table-wrapper">
+        <table class="source-recs-table">
+          <thead>
+            <tr>
+              <th>信源名称</th>
+              <th>标签</th>
+              <th>URL</th>
+              <th>综合评分</th>
+              <th>相关性</th>
+              <th>更新</th>
+              <th>权威性</th>
+              <th>发现时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    recs.forEach((r) => {
+      const qs = r.quality_score || 0;
+      const scoreClass = qs >= 4 ? "high" : qs >= 3 ? "mid" : "low";
+      recsHtml += `
+            <tr>
+              <td><strong>${escapeHtml(r.name)}</strong></td>
+              <td><span class="tag-chip">${escapeHtml(r.tag_label || r.tag)}</span></td>
+              <td><a href="${escapeHtml(r.url)}" target="_blank" title="${escapeHtml(r.url)}">${truncateUrl(r.url)}</a></td>
+              <td>
+                <span class="source-score">
+                  <span class="source-score-bar"><span class="source-score-fill ${scoreClass}" style="width:${qs * 20}%"></span></span>
+                  ${qs}
+                </span>
+              </td>
+              <td>${r.relevance_score || "—"}</td>
+              <td>${r.freshness_score || "—"}</td>
+              <td>${r.authority_score || "—"}</td>
+              <td>${r.discovered_at ? formatTime(r.discovered_at) : "—"}</td>
+              <td>
+                <button class="btn-approve" onclick="approveSource('${r.id}')" title="通过并加入抓取列表">
+                  通过
+                </button>
+              </td>
+            </tr>`;
+    });
+
+    recsHtml += `
+          </tbody>
+        </table>
+      </div>`;
+  } else if (items.length > 0) {
+    recsHtml = '<div style="padding:8px 0;color:var(--text-secondary);font-size:0.85rem;">暂无待审核信源推荐</div>';
+  }
+
+  container.innerHTML = `
+    <div class="source-health-grid">${healthGridHtml || '<span class="empty-hint">暂无数据</span>'}</div>
+    ${recsHtml}`;
+}
+
+async function approveSource(sourceId) {
+  if (!confirm("确定要通过此推荐信源吗？通过后将加入 RSS 抓取列表。")) return;
+  try {
+    const result = await apiPost(`/api/sources/approve?source_id=${encodeURIComponent(sourceId)}`);
+    showToast("success", `信源「${result.source?.name || sourceId}」已通过`);
+    loadSourcesHealth();
+  } catch (e) {
+    showToast("error", `审批失败: ${e.message}`);
+  }
+}
+
+function truncateUrl(url) {
+  if (!url) return "—";
+  try {
+    const u = new URL(url);
+    const display = u.hostname + (u.pathname.length > 25 ? u.pathname.slice(0, 25) + "…" : u.pathname);
+    return display;
+  } catch {
+    return url.length > 40 ? url.slice(0, 40) + "…" : url;
+  }
+}
 // ---------- Helpers ----------
 function statusClass(s) {
   if (s === "success") return "status-ok";

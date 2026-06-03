@@ -1,52 +1,73 @@
 <view class="container">
   <!-- 搜索栏 -->
   <view class="search-bar">
-    <input
-      class="search-input"
-      placeholder="搜索简报内容..."
-      value="{{keyword}}"
-      bindinput="onSearchInput"
-      confirm-type="search"
-      bindconfirm="onSearch"
-    />
-    <button class="search-btn" bindtap="onSearch">搜索</button>
+    <view class="search-box">
+      <text class="search-icon">🔍</text>
+      <input class="search-input" placeholder="搜索简报标题/要点..." value="{{keyword}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="onSearch" />
+      <text wx:if="{{keyword}}" class="search-clear" bindtap="onClear">✕</text>
+    </view>
   </view>
 
-  <!-- 结果数 -->
-  <view wx:if="{{keyword}}" class="result-hint">找到 {{total}} 条结果</view>
+  <!-- 统计摘要 -->
+  <view wx:if="{{!keyword && total > 0}}" class="history-summary">
+    <view class="hstat-item">
+      <text class="hstat-num">{{total}}</text>
+      <text class="hstat-label">总简报</text>
+    </view>
+    <view class="hstat-item">
+      <text class="hstat-num">{{morningCount}}</text>
+      <text class="hstat-label">早报</text>
+    </view>
+    <view class="hstat-item">
+      <text class="hstat-num">{{eveningCount}}</text>
+      <text class="hstat-label">晚报</text>
+    </view>
+  </view>
+
+  <!-- 搜索结果 -->
+  <view wx:if="{{keyword}}" class="result-hint">
+    搜索 "{{keyword}}" 找到 <text class="fw600">{{total}}</text> 条结果
+  </view>
 
   <!-- 列表 -->
-  <view wx:if="{{list.length > 0}}">
-    <view
-      wx:for="{{list}}"
-      wx:key="id"
-      class="card history-card"
-      data-id="{{item.id}}"
-      bindtap="onItemTap"
-    >
-      <view class="card-header">
-        <view class="card-type {{item.type}}">{{item.type === 'morning' ? '早报' : '晚报'}}</view>
-        <view class="card-subtitle">{{item.dateText}}</view>
+  <view wx:if="{{list.length > 0}}" class="history-list">
+    <view wx:for="{{list}}" wx:key="id" class="hcard" data-id="{{item.id}}" bindtap="onItemTap">
+      <view class="hcard-top">
+        <view class="hcard-type {{item.type}}">{{item.type === 'morning' ? '☀️ 早报' : '🌙 晚报'}}</view>
+        <view class="hcard-date">{{item.dateText}}</view>
+        <view class="hcard-ago">{{item.timeAgoText}}</view>
       </view>
-      <view
-        wx:for="{{item.tlDrPreview}}"
-        wx:for-item="point"
-        wx:key="*this"
-        class="history-tl"
-      >{{point}}</view>
-      <view wx:if="{{item.tl_dr.length > 3}}" class="more-hint">... 共 {{item.tl_dr.length}} 条要点</view>
+      <view class="hcard-points">
+        <view wx:for="{{item.tlDrPreview}}" wx:for-item="p" wx:key="*this" class="hcard-point">
+          <text class="hpoint-dot">{{index + 1}}</text>
+          <text>{{p}}</text>
+        </view>
+      </view>
+      <view class="hcard-bottom">
+        <text wx:if="{{item.tl_dr.length > 3}}" class="hcard-more">共 {{item.tl_dr.length}} 条要点</text>
+        <text class="hcard-arrow">查看详情 →</text>
+      </view>
     </view>
   </view>
 
   <!-- 加载中 -->
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:if="{{loading}}" class="loading">
+    <view class="loading-spinner"></view>
+    <text>加载中...</text>
+  </view>
 
   <!-- 到底 -->
-  <view wx:if="{{noMore && list.length > 0}}" class="loading">已加载全部</view>
+  <view wx:if="{{noMore && list.length > 0}}" class="loading" style="padding:20rpx">— 已加载全部 —</view>
 
-  <!-- 空状态 -->
+  <!-- 空 -->
   <view wx:if="{{!loading && list.length === 0}}">
-    <view wx:if="{{keyword}}" class="empty-state">未找到相关简报</view>
-    <view wx:else class="empty-state">暂无历史简报</view>
+    <view wx:if="{{keyword}}" class="empty-state">
+      <text class="empty-icon">🔍</text>
+      <text>未找到相关简报</text>
+    </view>
+    <view wx:else class="empty-state">
+      <text class="empty-icon">📋</text>
+      <text>暂无历史简报</text>
+    </view>
   </view>
 </view>

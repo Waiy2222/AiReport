@@ -67,6 +67,7 @@ async function loadAll() {
     if (hAll) renderModuleHealth(hAll, ov?.modules);
     if (us)  renderUserStats(us);
     if (vs)  renderVideos(vs);
+    refreshTagStates();
     if (!ov && !sch && !st && !hAll) showToast("error", "无法连接后端，请确认服务运行在 " + API_BASE);
   } catch (e) {
     console.error("loadAll error:", e);
@@ -111,8 +112,8 @@ function renderModuleHealth(healthAll, overviewModules) {
 // ---------- Render Overview (briefings) ----------
 function renderOverview(ov) {
   const container = document.getElementById("briefingCards");
-  // preview 在 module-b (8002) 或 nginx (80)，用 nginx 透传
-  const previewBase = `${window.location.protocol}//${window.location.hostname}/preview/`;
+  // preview 通过当前服务器代理到 module-b
+  const previewBase = `${window.location.origin}/preview/`;
   let html = "";
   ["morning", "evening"].forEach((type) => {
     const d = ov[type] || {};
@@ -623,7 +624,6 @@ function truncateUrl(url) {
     return url.length > 40 ? url.slice(0, 40) + "…" : url;
   }
 }
-
 // ---------- Helpers ----------
 function statusClass(s) {
   if (s === "success") return "status-ok";

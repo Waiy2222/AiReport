@@ -1,6 +1,7 @@
 """七步管道串联 — 读 raw_items → AI 加工 → 配图 → 写 briefings"""
 import json
 import uuid
+import logging
 import asyncpg
 
 from ai.analyzer import batch_score
@@ -8,8 +9,38 @@ from ai.dedup import url_dedup, semantic_dedup
 from ai.enricher import enrich
 from ai.summarizer import summarize
 from ai.image_matcher import match_images_for_briefing
+from ai.debate_agent import run_debate
 
+logger = logging.getLogger(__name__)
 SCORE_THRESHOLD = 6
+
+
+def _parse_metadata(it: dict) -> dict:
+    """安全解析 metadata 字段：处理 None / 缺失 / JSON 字符串三种情况"""
+    meta = it.get("metadata")
+    if meta is None:
+        return {}
+    if isinstance(meta, str):
+        try:
+            return json.loads(meta)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("Failed to parse metadata JSON string for item: %s", it.get("title", "?"))
+            return {}
+    if isinstance(meta, dict):
+        return meta
+    return {}
+
+
+def _get_ai_score(it: dict) -> float:
+    """安全获取 ai_score：优先从 metadata 取，其次从 item 直接字段"""
+    meta = _parse_metadata(it)
+    score = meta.get("ai_score")
+    if score is not None:
+        return float(score)
+    score = it.get("ai_score")
+    if score is not None:
+        return float(score)
+    return 0.0
 
 
 async def read_raw_items(pool: asyncpg.Pool, batch_id: uuid.UUID) -> list[dict]:
@@ -71,10 +102,7 @@ def _filter_items_by_tags(items: list[dict], filter_tags: list[str]) -> list[dic
     tag_set = set(filter_tags)
     result = []
     for it in items:
-        meta = it.get("metadata", {})
-        if isinstance(meta, str):
-            import json
-            meta = json.loads(meta)
+        meta = _parse_metadata(it)
         item_tags = set(meta.get("tags", []))
         if tag_set & item_tags:
             result.append(it)
@@ -98,6 +126,44 @@ def _filter_by_tags(briefing: dict, filter_tags: list[str]) -> dict:
     return briefing
 
 
+def _attach_debate_to_briefing(briefing: dict, source_items: list[dict]) -> None:
+    """将原始 items 的 debate 数据映射回 LLM 生成的 briefing sections 中。
+
+    匹配策略：先按 url 精确匹配，再按 title 前缀匹配（LLM 可能会改写标题）。
+    """
+    # 构建 source items 的 debate 查找表: {url: debate, title_prefix: debate}
+    url_debate_map = {}
+    title_debate_map = {}
+    for it in source_items:
+        meta = _parse_metadata(it)
+        debate = meta.get("debate")
+        if not debate:
+            continue
+        url = it.get("url", "")
+        title = it.get("title", "")
+        if url:
+            url_debate_map[url] = debate
+        if title:
+            # 取前 20 个字符做模糊匹配
+            title_debate_map[title[:20]] = debate
+
+    for section in briefing.get("sections", []):
+        for item in section.get("items", []):
+            # 精确 URL 匹配
+            item_url = item.get("url", "")
+            if item_url and item_url in url_debate_map:
+                item["debate"] = url_debate_map[item_url]
+                continue
+
+            # 模糊 title 匹配
+            item_title = item.get("title", "")
+            if item_title:
+                for prefix, debate in title_debate_map.items():
+                    if item_title[:15] == prefix[:15]:
+                        item["debate"] = debate
+                        break
+
+
 async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: str, batch_id: uuid.UUID, filter_tags: list[str] | None = None) -> dict:
     """执行完整 AI 加工流水线，返回 briefing_id 和统计信息"""
     stats = {
@@ -118,17 +184,26 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
         return {"briefing_id": briefing_id, "stats": stats, "briefing": {}}
 
     # ② AI 评分 — 优先使用模块 A 已计算的评分，仅当缺失时才调用 LLM
-    need_scoring = [it for it in items if not it.get("metadata", {}).get("ai_score")]
+    need_scoring = [it for it in items if not _get_ai_score(it)]
     if need_scoring:
-        need_scoring = await batch_score(need_scoring)
-        scored_map = {it["url"]: it.get("ai_score", 5.0) for it in need_scoring}
+        scored_batch = await batch_score(need_scoring)
+        scored_map = {it["url"]: it.get("ai_score", 5.0) for it in scored_batch}
         for it in items:
-            if not it.get("metadata", {}).get("ai_score"):
-                it["metadata"]["ai_score"] = scored_map.get(it["url"], 5.0)
-                it["ai_score"] = it["metadata"]["ai_score"]
+            if not _get_ai_score(it):
+                meta = _parse_metadata(it)
+                new_score = scored_map.get(it["url"], 5.0)
+                meta["ai_score"] = new_score
+                it["metadata"] = meta
+                it["ai_score"] = new_score
     for it in items:
-        it["ai_score"] = float(it.get("metadata", {}).get("ai_score", it.get("ai_score", 5.0)))
+        it["ai_score"] = _get_ai_score(it) or 5.0
     stats["scored"] = len(items)
+
+    # ②.⑤ Phase 3: AI 辩论 — 对高分新闻跑 3 个 Agent 多维度分析（失败不回退）
+    try:
+        items = await run_debate(items)
+    except Exception as e:
+        logger.warning("Debate step failed (non-blocking): %s", e)
 
     # ③ 过滤低分 (threshold >= 6)
     passed = [it for it in items if it.get("ai_score", 0) >= SCORE_THRESHOLD]
@@ -163,6 +238,9 @@ async def run_pipeline(pool: asyncpg.Pool, briefing_type: str, briefing_date: st
 
     # ⑧ 摘要 + 标签生成（V2: 含 headline + image_keywords）
     briefing = await summarize(passed, briefing_type)
+
+    # ⑧.⑤ Phase 3: 将辩论数据映射回 LLM 生成的 briefing items（按 URL/title 匹配）
+    _attach_debate_to_briefing(briefing, passed)
 
     # ⑨ 配图匹配（为 sections 中每条 item 匹配 image_url）
     briefing = await match_images_for_briefing(briefing)

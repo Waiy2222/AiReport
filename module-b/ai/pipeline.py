@@ -132,7 +132,7 @@ async def run_pipeline(
 
     # ---- Step 2: Score ---------------------------------------------------
     items = await _step_score(pool, items)
-    stats["scored"] = sum(1 for it in items if it.get("metadata", {}).get("ai_score") is not None)
+    stats["scored"] = sum(1 for it in items if _safe_meta(it).get("ai_score") is not None)
     logger.info("Step 2 (score): %d scored", stats["scored"])
 
     # ---- Step 3: Filter --------------------------------------------------
@@ -228,6 +228,10 @@ async def _step_score(pool: asyncpg.Pool, items: list[dict]) -> list[dict]:
     if not items:
         return items
 
+    # Ensure every item has a proper metadata dict
+    for it in items:
+        it["metadata"] = _safe_meta(it)
+
     if _has_api_key():
         await _score_via_api(items)
     else:
@@ -274,18 +278,40 @@ async def _score_via_api(items: list[dict]) -> None:
 
 def _build_score_prompt(batch: list[dict]) -> str:
     lines = []
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
     for idx, it in enumerate(batch):
+        # 计算新闻距今多久
+        age_str = ""
+        pub = it.get("published_at")
+        if pub:
+            try:
+                if isinstance(pub, str):
+                    pub = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                age_hours = (now - pub.astimezone(timezone.utc)).total_seconds() / 3600
+                if age_hours < 24:
+                    age_str = f"（{int(age_hours)}小时前发布）"
+                else:
+                    age_str = f"（{int(age_hours/24)}天前发布）"
+            except Exception:
+                pass
         lines.append(
             f"[{idx}] 标题: {it['title']}\n"
             f"    来源: {it['source']}\n"
+            f"    发布时间: {age_str}\n"
             f"    内容: {it['content'][:300]}"
         )
     joined = "\n\n".join(lines)
     return (
-        "请对以下每条AI资讯的相关性打分(1-10)。\n"
-        "评分标准：10分=重大AI新闻/重要开源发布/突破性技术进展; "
-        "8-9分=知名公司/项目动态/重要工具发布; 6-7分=有价值的行业资讯; "
-        "4-5分=一般性技术讨论; 1-3分=与AI核心领域关联较弱。\n\n"
+        "请对以下每条AI资讯的相关性和时效性打分(1-10)。\n"
+        "评分标准（不偏向任何单一领域，各领域平等对待）：\n"
+        "10分=当日重大突破/头部事件/重磅发布（不限领域：科技、体育、时政、财经均可）;\n"
+        "8-9分=近2日重要动态/知名公司/开源发布/赛事结果/政策出台;\n"
+        "6-7分=有价值的行业资讯/技术讨论/赛事预告/产业动态;\n"
+        "4-5分=一般内容或超过3天旧闻;\n"
+        "1-3分=关联弱或超过1周旧闻。\n"
+        "⏰ 时效性是第一权重：3天前扣2分，5天前扣4分，7天以上不超过3分。\n"
+        "领域多样性与AI核心同等重要。\n\n"
         f"以JSON数组格式返回：[{{\"index\":0,\"score\":8.5}}, ...]\n\n"
         f"{joined}"
     )
@@ -293,25 +319,45 @@ def _build_score_prompt(batch: list[dict]) -> str:
 
 def _mock_score_one(item: dict) -> float:
     """Heuristic scoring when no API key is available."""
+    from datetime import datetime, timezone
     combined = (item.get("title", "") + " " + item.get("content", "")).lower()
     score = 5.0
 
-    # High-signal keywords
+    # 时效惩罚：检查发布时间
+    pub = item.get("published_at")
+    if pub:
+        try:
+            if isinstance(pub, str):
+                pub = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+            age_hours = (datetime.now(timezone.utc) - pub.astimezone(timezone.utc)).total_seconds() / 3600
+            if age_hours > 72:   # 3天以上
+                score -= 2
+            if age_hours > 120:  # 5天以上
+                score -= 4
+            if age_hours > 168:  # 7天以上
+                score -= 6
+        except Exception:
+            pass
+
+    # High-signal keywords (all domains)
     for kw in ["发布", "开源", "release", "launch", "正式", "突破",
-               "超越", "发布new", "v0.", "v1.", "v2.", "v3.", "v4.", "v5."]:
+               "超越", "夺冠", "决赛", "上市", "签署", "出台", "突破",
+               "v0.", "v1.", "v2.", "v3.", "v4.", "v5."]:
         if kw.lower() in combined:
             score += 0.5
 
-    # Important entities
+    # Important entities (AI + 体育 + 科技 + 时政)
     for ent in ["deepseek", "openai", "gpt", "claude", "gemini", "llama",
                 "meta", "google", "anthropic", "langchain", "agent",
-                "rag", "mcp", "vllm", "chromadb", "huggingface",
-                "qwen", "通义", "文心", "百川", "chatglm"]:
+                "rag", "vllm", "huggingface", "qwen", "通义", "文心",
+                "nba", "espn", "库里", "詹姆斯", "欧冠", "英超", "lpl",
+                "欧盟", "白宫", "国务院", "商务部", "央行",
+                "苹果", "特斯拉", "华为", "字节", "腾讯", "阿里"]:
         if ent in combined:
             score += 0.5
 
-    # Source bonus
-    if item.get("source") in ("github", "hackernews"):
+    # Source bonus (broadened)
+    if item.get("source") in ("github", "hackernews", "espn", "cnbc", "techcrunch", "36氪"):
         score += 0.5
 
     return round(max(1.0, min(10.0, score)), 1)
@@ -321,11 +367,26 @@ def _mock_score_one(item: dict) -> float:
 # Step 3 — Filter
 # ===================================================================
 
-async def _step_filter(items: list[dict], threshold: float = 6.0) -> tuple[list[dict], list[dict]]:
+def _safe_meta(it: dict) -> dict:
+    """安全获取 metadata 字典：处理 None / 缺失 / JSON 字符串"""
+    meta = it.get("metadata")
+    if meta is None:
+        return {}
+    if isinstance(meta, str):
+        try:
+            return json.loads(meta)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    if isinstance(meta, dict):
+        return meta
+    return {}
+
+
+async def _step_filter(items: list[dict], threshold: float = 5.5) -> tuple[list[dict], list[dict]]:
     passed: list[dict] = []
     removed: list[dict] = []
     for it in items:
-        s = it.get("metadata", {}).get("ai_score", 0)
+        s = _safe_meta(it).get("ai_score", 0)
         if isinstance(s, (int, float)) and s >= threshold:
             passed.append(it)
         else:
@@ -354,8 +415,10 @@ async def _dedup_via_api(items: list[dict]) -> tuple[list[dict], int]:
             f"    内容: {it['content'][:200]}"
         )
     prompt = (
-        "识别以下资讯中报道同一事件的重复/近似重复条目，返回需要删除的索引数组"
-        "（保留质量最高的一条）。以JSON数组格式返回如 [1,5,7]。没有重复则返回 []。\n\n"
+        "严格识别以下资讯中的重复条目，返回所有应删除的索引数组。\n"
+        "重复包括：同一事件不同媒体报道、同一产品不同角度、同一场比赛不同来源。\n"
+        "保留评分最高/信息最丰富的一条，删除其余。\n"
+        "以JSON数组格式返回如 [1,5,7]。没有重复则返回 []。\n\n"
         + "\n\n".join(lines)
     )
     result = await _llm_chat([
@@ -392,7 +455,7 @@ def _dedup_heuristic(items: list[dict]) -> tuple[list[dict], int]:
                 continue
             overlap = len(tokens & seen)
             union = len(tokens | seen)
-            if overlap / union > 0.5:  # more than 50% overlap
+            if overlap / union > 0.35:  # more than 35% overlap → duplicate
                 is_dup = True
                 break
         if is_dup:
@@ -411,6 +474,9 @@ def _dedup_heuristic(items: list[dict]) -> tuple[list[dict], int]:
 async def _step_enrich(items: list[dict]) -> list[dict]:
     if not items:
         return items
+    # Ensure metadata is a proper dict (belt-and-suspenders after _step_score)
+    for it in items:
+        it["metadata"] = _safe_meta(it)
     if _has_api_key():
         await _enrich_via_api(items)
     else:
@@ -491,8 +557,8 @@ async def _generate_via_api(
 ) -> dict | None:
     lines = []
     for idx, it in enumerate(items):
-        score = it.get("metadata", {}).get("ai_score", "N/A")
-        bg = it.get("metadata", {}).get("background", "")
+        score = _safe_meta(it).get("ai_score", "N/A")
+        bg = _safe_meta(it).get("background", "")
         lines.append(
             f"[{idx}] 标题: {it['title']}\n"
             f"    来源: {it['source']}\n"
@@ -507,9 +573,12 @@ async def _generate_via_api(
         f"日期：{briefing_date.isoformat()}\n\n"
         "请以严格的JSON格式返回（不要markdown代码块），包含三个字段：\n"
         "1. tl_dr: 5-10条核心要点（中文一句话概括）\n"
-        "2. sections: 按主题分组的章节数组，每个章节含 title 和 items。"
+        "2. sections: 按主题分组的章节数组（5-8个章节），每个章节含 title 和 items。"
         "每个item含 title, summary(50-100字中文), score(数字), url, source, tags(2-4个中文标签数组)\n"
         "3. key_takeaways: 3-5条关键洞察（中文）\n\n"
+        "重要：请覆盖以下标签类别，每个类别至少1条："
+        "LLM、Agent、开源、基础设施、多模态、AI编程、AI产品、AI安全、AI政策、融资、体育、时事、科技、工具、政策。"
+        "未覆盖类别的酌情扣分。\n\n"
         "信息如下：\n\n" + "\n\n".join(lines) + "\n\n"
         "请直接返回JSON对象：{\"tl_dr\":[...], \"sections\":[...], \"key_takeaways\":[...]}"
     )
@@ -546,7 +615,7 @@ def _generate_mock(
 
 def _mock_tldr(items: list[dict]) -> list[str]:
     ranked = sorted(items,
-                    key=lambda x: x.get("metadata", {}).get("ai_score", 0),
+                    key=lambda x: _safe_meta(x).get("ai_score", 0),
                     reverse=True)
     result: list[str] = []
     for it in ranked[:10]:
@@ -602,7 +671,7 @@ def _mock_sections(items: list[dict]) -> list[dict]:
             items_list.append({
                 "title": it["title"],
                 "summary": it["content"][:100] if it["content"] else it["title"],
-                "score": it.get("metadata", {}).get("ai_score", 5),
+                "score": _safe_meta(it).get("ai_score", 5),
                 "url": it["url"],
                 "source": it["source"],
                 "tags": _extract_tags(it),

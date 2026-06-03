@@ -1,0 +1,61 @@
+.container { padding: 24rpx; min-height: 100vh; background: #f5f5f5; }
+
+/* ── 加载/空状态 ── */
+.loading, .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 200rpx; }
+.loading-spinner { width: 60rpx; height: 60rpx; border: 4rpx solid #e0e0e0; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { margin-top: 20rpx; color: #999; font-size: 28rpx; }
+.empty-icon { font-size: 80rpx; margin-bottom: 20rpx; }
+.empty-text { font-size: 28rpx; color: #999; }
+
+/* ── 统计概览 ── */
+.trend-stats-row { display: flex; gap: 12rpx; margin-bottom: 24rpx; }
+.tstat-card { flex: 1; background: #fff; border-radius: 16rpx; padding: 20rpx 10rpx; text-align: center; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04); }
+.tstat-value { display: block; font-size: 44rpx; font-weight: 700; color: #1a1a2e; }
+.tstat-label { font-size: 22rpx; color: #999; margin-top: 4rpx; }
+
+/* ── Agent 解读卡片 ── */
+.agent-card { background: linear-gradient(135deg, #f5f3ff, #ede9fe); border-radius: 24rpx; padding: 32rpx; margin-bottom: 24rpx; border: 1rpx solid #e0d8f0; }
+.agent-header { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; }
+.agent-icon { font-size: 44rpx; }
+.agent-title-row { display: flex; flex-direction: column; }
+.agent-title { font-size: 32rpx; font-weight: 700; color: #5b3ea8; }
+.agent-subtitle { font-size: 22rpx; color: #9888c8; }
+.agent-text { font-size: 28rpx; color: #334; line-height: 1.7; display: block; }
+.agent-meta { display: flex; justify-content: space-between; margin-top: 16rpx; font-size: 22rpx; color: #9888c8; }
+
+/* ── 趋势分区 ── */
+.trend-section { margin-bottom: 24rpx; }
+.section-header { display: flex; align-items: baseline; gap: 8rpx; margin-bottom: 16rpx; padding-left: 4rpx; }
+.section-icon { font-size: 32rpx; }
+.section-title { font-size: 30rpx; font-weight: 700; color: #1a1a2e; }
+.section-sub { font-size: 22rpx; color: #aaa; margin-left: auto; }
+
+/* ── 趋势条目卡片 ── */
+.trend-card { display: flex; align-items: center; background: #fff; border-radius: 16rpx; padding: 20rpx 24rpx; margin-bottom: 12rpx; box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.03); gap: 16rpx; }
+.trend-rank { width: 48rpx; height: 48rpx; line-height: 48rpx; text-align: center; border-radius: 12rpx; font-size: 26rpx; font-weight: 700; flex-shrink: 0; }
+.rank-1 { background: #ffe0e0; color: #e64a4a; }
+.rank-2 { background: #ffedd5; color: #e67e22; }
+.rank-3 { background: #fef3c7; color: #d97706; }
+.rank-down { background: #dbeafe; color: #4a6fa5; }
+.trend-info { flex: 1; min-width: 0; }
+.trend-name-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10rpx; }
+.trend-name { font-size: 28rpx; font-weight: 600; color: #1a1a2e; }
+.trend-pct { font-size: 28rpx; font-weight: 700; }
+.trend-pct.up { color: #e64a4a; }
+.trend-pct.down { color: #4a90d9; }
+.trend-bar-row { display: flex; align-items: center; gap: 12rpx; }
+.trend-bar-track { flex: 1; height: 10rpx; background: #eee; border-radius: 5rpx; overflow: hidden; }
+.trend-bar-fill { height: 100%; border-radius: 5rpx; }
+.up-fill { background: linear-gradient(90deg, #fca5a5, #e64a4a); }
+.down-fill { background: linear-gradient(90deg, #93c5fd, #4a90d9); }
+.trend-counts { font-size: 22rpx; color: #999; white-space: nowrap; }
+
+/* ── 新兴标签 ── */
+.new-tags-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.new-tag-card { background: #f0fdf4; border: 1rpx solid #bbf7d0; border-radius: 16rpx; padding: 20rpx 28rpx; text-align: center; min-width: 160rpx; }
+.new-tag-name { display: block; font-size: 28rpx; font-weight: 600; color: #166534; }
+.new-tag-date { font-size: 20rpx; color: #6b9; margin-top: 8rpx; }
+
+/* ── 底部 ── */
+.trend-footer { text-align: center; padding: 30rpx 0; font-size: 22rpx; color: #ccc; }

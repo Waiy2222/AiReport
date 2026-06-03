@@ -8,6 +8,11 @@ BRIEFINGS = [
         "type": "morning",
         "date": "2026-05-24",
         "language": "zh",
+        "headline": {
+            "title": "DeepSeek-V4引爆开源革命：370B参数训练成本仅$5M",
+            "summary": "MoE架构+MIT协议，多项基准达GPT-5同级，HN社区24小时内2万+评论",
+            "item_index": 0,
+        },
         "tl_dr": [
             "DeepSeek-V4技术报告引发全球关注，MoE架构370B参数开源，训练成本仅500万美元",
             "Meta开源Llama-4-R1推理增强模型，MIT许可证，多项基准达GPT-5同级",
@@ -104,7 +109,15 @@ BRIEFINGS = [
             "AI工具链基础设施加速成熟，vLLM/ChromaDB/RAGFlow密集发布大版本",
             "欧盟AI监管正式落地，合规成本将成为AI企业重要考量",
         ],
-        "raw_stats": {"fetched": 30, "scored": 30, "passed": 14, "dedup_removed": 2},
+        "raw_stats": {
+            "fetched": 98,
+            "scored": 98,
+            "passed": 45,
+            "dedup_url_removed": 8,
+            "dedup_semantic_removed": 15,
+            "final_count": 17,
+            "headline": {"title": "Meta开源Llama-4-R1推理增强模型", "summary": "GPT-5同级+MIT许可证，开源社区沸腾", "item_index": 0},
+        },
         "generated_at": "2026-05-24T08:00:00+00:00",
     },
     {
@@ -112,6 +125,11 @@ BRIEFINGS = [
         "type": "morning",
         "date": "2026-05-23",
         "language": "zh",
+        "headline": {
+            "title": "Anthropic发布Claude Opus 4.6，Agent能力跃升",
+            "summary": "SWE-Bench Verified 85%，多Agent协作能力显著增强",
+            "item_index": 0,
+        },
         "tl_dr": [
             "Anthropic Claude Opus 4.6发布，Agent能力显著提升",
             "LangChain发布多Agent协作框架",
@@ -135,7 +153,15 @@ BRIEFINGS = [
             }
         ],
         "key_takeaways": ["Agent能力成为大模型核心竞争力"],
-        "raw_stats": {"fetched": 28, "scored": 28, "passed": 12},
+        "raw_stats": {
+            "fetched": 85,
+            "scored": 85,
+            "passed": 38,
+            "dedup_url_removed": 6,
+            "dedup_semantic_removed": 11,
+            "final_count": 14,
+            "headline": {"title": "Claude Opus 4.6发布", "summary": "Agent能力显著提升", "item_index": 0},
+        },
         "generated_at": "2026-05-23T08:00:00+00:00",
     },
     {
@@ -143,6 +169,11 @@ BRIEFINGS = [
         "type": "evening",
         "date": "2026-05-23",
         "language": "zh",
+        "headline": {
+            "title": "Dify v1.5多Agent工作流上线，低代码构建AI应用",
+            "summary": "新增RAG管道可视化编排，企业级部署能力大幅提升",
+            "item_index": 0,
+        },
         "tl_dr": [
             "Dify v1.5多Agent工作流上线",
             "PromptFlow开源引发LLM工具链讨论",
@@ -166,7 +197,15 @@ BRIEFINGS = [
             }
         ],
         "key_takeaways": ["AI开发工具链日趋成熟，低代码Agent构建成为趋势"],
-        "raw_stats": {"fetched": 25, "scored": 25, "passed": 10},
+        "raw_stats": {
+            "fetched": 72,
+            "scored": 72,
+            "passed": 31,
+            "dedup_url_removed": 5,
+            "dedup_semantic_removed": 9,
+            "final_count": 11,
+            "headline": {"title": "Dify v1.5多Agent工作流上线", "summary": "低代码Agent构建成为趋势", "item_index": 0},
+        },
         "generated_at": "2026-05-23T20:00:00+00:00",
     },
 ]
@@ -180,8 +219,46 @@ MOCK_SUBSCRIPTIONS = [
 ]
 
 
+# Phase 3: Mock 辩论数据（给高分项注入三方观点）
+_MOCK_DEBATES = [
+    {
+        "tech_view": "MoE架构370B参数训到GPT-5同级仅$5M，这证明了高效训练路线可行。对开源社区是巨大推动，开发者无需依赖闭源API。",
+        "biz_view": "$5M训练成本意味着大模型门槛骤降90%。中小公司也能自训高性能模型，OpenAI/Anthropic的API定价权受到根本性挑战。",
+        "social_view": "超低训练成本可能引发AI滥用风险——恶意行为者也负担得起。但整体而言，技术民主化利大于弊，需要配套监管框架。",
+        "consensus": "三方均认同DeepSeek-V4是里程碑式突破",
+        "controversy": 3,
+    },
+    {
+        "tech_view": "MIT许可证+推理增强+GPT-5同级，Meta这次开源的诚意十足。RL-based reasoning路线和DeepSeek-R1互补，技术选型更丰富。",
+        "biz_view": "Meta用开源战略瓦解竞争对手的商业壁垒。Llama生态扩大意味着Meta可以后发制人，通过云服务和广告变现。",
+        "social_view": "开源模型进步让AI能力更普惠，但推理模型的误用风险（编造/欺骗）需要关注。MIT许可证意味着几乎无使用限制。",
+        "consensus": "三方一致看好Llama-4-R1开源对行业影响",
+        "controversy": 4,
+    },
+    {
+        "tech_view": "Agent原生API是重要方向——Gemini从被动响应转向主动执行。浏览器自动化+代码执行能力使其成为真正的数字助手。",
+        "biz_view": "Google借Agent切入企业自动化市场，与Microsoft Copilot正面竞争。搜索+Agent绑定可能成为新的商业护城河。",
+        "social_view": "Agent自主执行代码和浏览器操作引发安全担忧。Google需要透明度和安全沙箱机制，否则监管机构可能介入。",
+        "consensus": "三方认可Agent方向但安全顾虑不同",
+        "controversy": 5,
+    },
+]
+
+
+def _inject_mock_debate(briefing: dict) -> dict:
+    """为 mock 简报中的高分项注入辩论数据，模拟 Phase 3 辩论效果"""
+    debate_idx = 0
+    for section in briefing.get("sections", []):
+        for item in section.get("items", []):
+            if item.get("score", 0) >= 8.0 and debate_idx < len(_MOCK_DEBATES):
+                item["debate"] = _MOCK_DEBATES[debate_idx]
+                debate_idx += 1
+    return briefing
+
+
 def get_briefings():
-    return copy.deepcopy(BRIEFINGS)
+    briefings = copy.deepcopy(BRIEFINGS)
+    return [_inject_mock_debate(b) for b in briefings]
 
 
 def get_subscriptions():
@@ -191,18 +268,27 @@ def get_subscriptions():
 # ── Phase 2 新增假数据 ──────────────────────────────────────────
 
 TAG_CATALOG = [
+    # AI 核心领域
     {"tag": "LLM", "category": "topic", "label_zh": "大模型", "description": "LLM/ChatGPT/Claude/Gemini等", "sort_order": 1},
     {"tag": "开源", "category": "topic", "label_zh": "开源项目", "description": "开源框架、工具、模型", "sort_order": 2},
-    {"tag": "Python", "category": "topic", "label_zh": "Python", "description": "Python生态/AI开发", "sort_order": 3},
-    {"tag": "AI安全", "category": "topic", "label_zh": "AI安全", "description": "对齐/红队/鲁棒性", "sort_order": 4},
-    {"tag": "Agent", "category": "topic", "label_zh": "智能体", "description": "AI Agent/多Agent协作", "sort_order": 5},
-    {"tag": "AI产品", "category": "topic", "label_zh": "AI产品", "description": "AI应用/商业化/SaaS", "sort_order": 6},
-    {"tag": "RAG", "category": "topic", "label_zh": "RAG", "description": "检索增强生成", "sort_order": 7},
-    {"tag": "多模态", "category": "topic", "label_zh": "多模态", "description": "视觉/语音/视频理解", "sort_order": 8},
-    {"tag": "AI编程", "category": "topic", "label_zh": "AI编程", "description": "Copilot/IDE/代码生成", "sort_order": 9},
+    {"tag": "Agent", "category": "topic", "label_zh": "智能体", "description": "AI Agent/多Agent协作", "sort_order": 3},
+    {"tag": "基础设施", "category": "topic", "label_zh": "基础设施", "description": "GPU/推理/部署/向量数据库", "sort_order": 4},
+    {"tag": "多模态", "category": "topic", "label_zh": "多模态", "description": "视觉/语音/视频理解", "sort_order": 5},
+    {"tag": "RAG", "category": "topic", "label_zh": "RAG", "description": "检索增强生成", "sort_order": 6},
+    {"tag": "AI编程", "category": "topic", "label_zh": "AI编程", "description": "Copilot/IDE/代码生成", "sort_order": 7},
+    {"tag": "AI产品", "category": "topic", "label_zh": "AI产品", "description": "AI应用/商业化/SaaS", "sort_order": 8},
+    {"tag": "AI安全", "category": "topic", "label_zh": "AI安全", "description": "对齐/红队/鲁棒性", "sort_order": 9},
     {"tag": "AI政策", "category": "topic", "label_zh": "AI政策", "description": "监管/合规/政策/伦理", "sort_order": 10},
     {"tag": "融资", "category": "topic", "label_zh": "融资并购", "description": "AI创投/融资/acquisition", "sort_order": 11},
-    {"tag": "基础设施", "category": "topic", "label_zh": "基础设施", "description": "GPU/推理/部署/向量数据库", "sort_order": 12},
+    {"tag": "Python", "category": "topic", "label_zh": "Python", "description": "Python生态/AI开发", "sort_order": 12},
+    # 扩展领域（简报中也覆盖的通用领域）
+    {"tag": "科技", "category": "domain", "label_zh": "科技", "description": "科技互联网/数码硬件", "sort_order": 13},
+    {"tag": "工具", "category": "domain", "label_zh": "工具", "description": "实用工具/效率应用", "sort_order": 14},
+    {"tag": "体育", "category": "domain", "label_zh": "体育", "description": "体育赛事/NBA/足球等", "sort_order": 15},
+    {"tag": "时事", "category": "domain", "label_zh": "时事", "description": "国内外时事新闻", "sort_order": 16},
+    {"tag": "国际", "category": "domain", "label_zh": "国际", "description": "国际关系/地缘政治", "sort_order": 17},
+    {"tag": "政策", "category": "domain", "label_zh": "政策", "description": "政策法规/产业规划", "sort_order": 18},
+    {"tag": "安全", "category": "domain", "label_zh": "安全", "description": "网络安全/隐私保护", "sort_order": 19},
 ]
 
 MOCK_USER_PREFERENCES = {

@@ -33,7 +33,7 @@
         data-index="{{i}}"
         bindtap="onSectionToggle"
       >
-        <view class="section-title">{{item.title}}</view>
+        <view class="section-title">{{item.section_title}}</view>
         <view class="section-toggle">{{sectionsExpanded[i] ? '收起' : '展开'}}</view>
       </view>
 
@@ -45,7 +45,42 @@
           class="article-card"
         >
           <view class="article-title">{{article.title}}</view>
+          <image
+            wx:if="{{article.image_url && !article._imgHide}}"
+            src="{{article.image_url}}"
+            mode="widthFix"
+            class="article-image"
+            lazy-load
+            binderror="onImageError"
+            data-section="{{i}}"
+            data-index="{{index}}"
+          />
           <view class="article-summary">{{article.summary}}</view>
+          <!-- Phase 3: AI 三方观点辩论卡片 -->
+          <view wx:if="{{article.debate}}" class="debate-card">
+            <view class="debate-header">🎭 AI三方观点</view>
+            <view class="debate-views">
+              <view wx:if="{{article.debate.tech_view}}" class="debate-view debate-tech">
+                <view class="debate-label">🔧 技术视角</view>
+                <view class="debate-text">{{article.debate.tech_view}}</view>
+              </view>
+              <view wx:if="{{article.debate.biz_view}}" class="debate-view debate-biz">
+                <view class="debate-label">💼 商业视角</view>
+                <view class="debate-text">{{article.debate.biz_view}}</view>
+              </view>
+              <view wx:if="{{article.debate.social_view}}" class="debate-view debate-social">
+                <view class="debate-label">🌍 社会视角</view>
+                <view class="debate-text">{{article.debate.social_view}}</view>
+              </view>
+            </view>
+            <view wx:if="{{article.debate.controversy > 0}}" class="controversy-bar">
+              <view class="controversy-label">争议度</view>
+              <view class="controversy-track">
+                <view class="controversy-fill" style="width: {{article.debate.controversy * 10}}%"></view>
+              </view>
+              <view class="controversy-value">{{article.debate.controversy}}/10</view>
+            </view>
+          </view>
           <view class="article-meta">
             <text class="tag">{{article.source}}</text>
             <text class="tag" wx:for="{{article.tags}}" wx:key="*this" wx:for-item="t">{{t}}</text>

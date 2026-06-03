@@ -41,6 +41,10 @@ _db_ok = False
 from tags import router as tags_router, set_db_pool as set_tags_db_pool
 app.include_router(tags_router)
 
+# 注册 Phase 3 趋势路由
+from trends import router as trends_router, set_db_pool as set_trends_db_pool
+app.include_router(trends_router)
+
 
 @app.on_event("startup")
 async def startup():
@@ -52,6 +56,7 @@ async def startup():
             await conn.fetchval("SELECT 1")
         _db_ok = True
         set_tags_db_pool(pool)
+        set_trends_db_pool(pool)
         print("[module-c] PostgreSQL connected")
     except Exception:
         _db_ok = False
@@ -102,13 +107,18 @@ async def get_latest(type: str = Query(..., description="morning or evening")):
         )
         if not row:
             raise HTTPException(404, "no briefing found")
+        raw_stats = row["raw_stats"] or {}
+        if isinstance(raw_stats, str):
+            raw_stats = json.loads(raw_stats)
         return {
             "id": str(row["id"]),
             "type": row["type"],
             "date": str(row["date"]),
+            "headline": raw_stats.get("headline", {}),
             "tl_dr": row["tl_dr"],
             "sections": row["sections"],
             "key_takeaways": row["key_takeaways"],
+            "raw_stats": raw_stats,
             "generated_at": row["generated_at"].isoformat(),
         }
     except RuntimeError:

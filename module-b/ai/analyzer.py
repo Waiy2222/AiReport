@@ -1,7 +1,10 @@
 """批量评分 — 调用 DeepSeek 对资讯进行 0-10 分评分"""
 import json
+import logging
 from .client import get_client, DEEPSEEK_MODEL
 from .prompts import SCORING_SYSTEM, scoring_user
+
+logger = logging.getLogger(__name__)
 
 
 async def batch_score(items: list[dict], batch_size: int = 15) -> list[dict]:
@@ -33,6 +36,7 @@ async def batch_score(items: list[dict], batch_size: int = 15) -> list[dict]:
                 scored_items.append(item)
         except Exception as e:
             # API 失败时给默认分，不阻塞流水线
+            logger.error("Batch score API call failed (batch %d-%d): %s", i, i + len(batch), e, exc_info=True)
             for item in batch:
                 item["ai_score"] = 5.0
                 item["score_reason"] = f"评分异常: {e}"

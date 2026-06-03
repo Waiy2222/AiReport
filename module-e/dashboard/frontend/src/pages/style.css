@@ -373,6 +373,19 @@ body {
   display: none;
 }
 
+/* 无相关新闻的标签 — 灰色禁用 */
+.tag-checkbox.tag-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #f0f0f0;
+  color: #aaa;
+}
+
+.tag-checkbox.tag-disabled:hover {
+  background: #f0f0f0;
+  border-color: #e0e0e0;
+}
+
 .btn-quick-toggle {
   margin-left: auto;
   font-size: 0.72rem;

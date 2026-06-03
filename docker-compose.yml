@@ -14,6 +14,7 @@ services:
       - ./contracts/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql
       - ./contracts/schema_v2.sql:/docker-entrypoint-initdb.d/03-schema_v2.sql
       - ./contracts/seed_data_v2.sql:/docker-entrypoint-initdb.d/04-seed_data_v2.sql
+      - ./contracts/schema_v3.sql:/docker-entrypoint-initdb.d/05-schema_v3.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -109,11 +110,13 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      VIDEO_SEARCH_SOURCES: ${VIDEO_SEARCH_SOURCES:-bilibili,pexels}
       VIDEO_OUTPUT_DIR: /app/output
       VIDEO_DOWNLOAD_DIR: /app/downloads
     volumes:
       - video_output:/app/output
       - video_downloads:/app/downloads
+      - whisper_cache:/root/.cache/whisper
     depends_on:
       postgres:
         condition: service_healthy
@@ -136,3 +139,4 @@ volumes:
   pgdata:
   video_output:
   video_downloads:
+  whisper_cache:

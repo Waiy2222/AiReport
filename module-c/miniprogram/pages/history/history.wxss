@@ -1,77 +1,41 @@
-.search-bar {
-  display: flex;
-  margin-bottom: 16px;
-}
+.container { padding: 24rpx; min-height: 100vh; background: #f5f5f5; }
 
-.search-input {
-  flex: 1;
-  height: 40px;
-  background: #fff;
-  border-radius: 10px;
-  padding: 0 14px;
-  font-size: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
+/* ── 搜索栏 ── */
+.search-bar { margin-bottom: 20rpx; }
+.search-box { display: flex; align-items: center; background: #fff; border-radius: 20rpx; padding: 0 20rpx; height: 72rpx; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.05); }
+.search-icon { font-size: 28rpx; margin-right: 12rpx; }
+.search-input { flex: 1; font-size: 28rpx; }
+.search-clear { font-size: 28rpx; color: #bbb; padding: 8rpx; }
 
-.search-btn {
-  width: 64px;
-  height: 40px;
-  line-height: 40px;
-  text-align: center;
-  background: #4a90d9;
-  color: #fff;
-  border-radius: 10px;
-  font-size: 14px;
-  margin-left: 8px;
-  padding: 0;
-}
+/* ── 统计摘要 ── */
+.history-summary { display: flex; gap: 12rpx; margin-bottom: 20rpx; }
+.hstat-item { flex: 1; background: #fff; border-radius: 12rpx; padding: 16rpx 8rpx; text-align: center; box-shadow: 0 1rpx 4rpx rgba(0,0,0,0.03); }
+.hstat-num { display: block; font-size: 36rpx; font-weight: 700; color: #4a90d9; }
+.hstat-label { font-size: 22rpx; color: #999; margin-top: 4rpx; }
 
-.result-hint {
-  font-size: 13px;
-  color: #999;
-  margin-bottom: 12px;
-}
+.result-hint { font-size: 26rpx; color: #999; margin-bottom: 16rpx; }
+.fw600 { font-weight: 600; color: #4a90d9; }
 
-.history-card {
-  padding: 16px;
-}
+/* ── 简报卡片 ── */
+.hcard { background: #fff; border-radius: 16rpx; padding: 24rpx; margin-bottom: 16rpx; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04); }
+.hcard-top { display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx; }
+.hcard-type { font-size: 24rpx; font-weight: 600; padding: 4rpx 16rpx; border-radius: 16rpx; }
+.hcard-type.morning { background: #fff3e0; color: #e67e22; }
+.hcard-type.evening { background: #e8eaf6; color: #5c6bc0; }
+.hcard-date { font-size: 24rpx; color: #666; }
+.hcard-ago { font-size: 22rpx; color: #bbb; margin-left: auto; }
 
-.card-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
+.hcard-points { margin-bottom: 12rpx; }
+.hcard-point { display: flex; align-items: baseline; gap: 10rpx; padding: 6rpx 0; font-size: 26rpx; color: #555; line-height: 1.5; }
+.hpoint-dot { width: 32rpx; height: 32rpx; line-height: 32rpx; text-align: center; background: #e8f0fe; color: #4a90d9; border-radius: 50%; font-size: 20rpx; font-weight: 700; flex-shrink: 0; }
 
-.card-type {
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  margin-right: 10px;
-}
+.hcard-bottom { display: flex; justify-content: space-between; align-items: center; }
+.hcard-more { font-size: 22rpx; color: #bbb; }
+.hcard-arrow { font-size: 24rpx; color: #4a90d9; font-weight: 500; }
 
-.card-type.morning {
-  background: #fff3e0;
-  color: #e67e22;
-}
-
-.card-type.evening {
-  background: #e8eaf6;
-  color: #5c6bc0;
-}
-
-.history-tl {
-  font-size: 14px;
-  color: #555;
-  padding: 3px 0;
-  line-height: 1.5;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.more-hint {
-  font-size: 12px;
-  color: #bbb;
-  margin-top: 6px;
-}
+/* ── 通用 ── */
+.loading { text-align: center; padding: 40rpx 0; color: #999; font-size: 24rpx; }
+.loading-spinner { width: 48rpx; height: 48rpx; border: 3rpx solid #e0e0e0; border-top-color: #4a90d9; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16rpx; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty-state { text-align: center; padding: 100rpx 20rpx; color: #999; font-size: 26rpx; }
+.empty-icon { font-size: 64rpx; display: block; margin-bottom: 12rpx; }

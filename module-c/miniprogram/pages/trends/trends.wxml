@@ -2,70 +2,126 @@
   <!-- 加载中 -->
   <view wx:if="{{loading}}" class="loading">
     <view class="loading-spinner"></view>
-    <text class="loading-text">趋势分析中...</text>
+    <text class="loading-text">AI 正在分析趋势...</text>
   </view>
 
-  <!-- 错误状态 -->
-  <view wx:elif="{{error}}" class="empty-state">
+  <!-- 错误 -->
+  <view wx:elif="{{error}}" class="empty-state" bindtap="fetchTrends">
     <text class="empty-icon">⚠️</text>
-    <text class="empty-text">加载失败，下拉刷新重试</text>
+    <text class="empty-text">加载失败，点击重试</text>
   </view>
 
-  <!-- 正常内容 -->
-  <view wx:else>
-    <!-- Agent 解读卡片 -->
-    <view class="agent-insight-card" wx:if="{{agent_insight}}">
-      <view class="insight-header">
-        <text class="insight-icon">🤖</text>
-        <text class="insight-title">Agent 趋势解读</text>
+  <!-- 趋势数据 -->
+  <view wx:else class="trends-content">
+
+    <!-- 统计概览 -->
+    <view class="trend-stats-row">
+      <view class="tstat-card">
+        <text class="tstat-value">{{rising.length}}</text>
+        <text class="tstat-label">飙升标签</text>
       </view>
-      <text class="insight-text">{{agent_insight}}</text>
-      <text class="insight-period">{{period}}</text>
+      <view class="tstat-card">
+        <text class="tstat-value">{{falling.length}}</text>
+        <text class="tstat-label">降温标签</text>
+      </view>
+      <view class="tstat-card">
+        <text class="tstat-value">{{new_tags.length}}</text>
+        <text class="tstat-label">新兴标签</text>
+      </view>
+      <view class="tstat-card">
+        <text class="tstat-value">{{totalTags}}</text>
+        <text class="tstat-label">活跃标签</text>
+      </view>
     </view>
 
-    <!-- 🔥 热度飙升榜 -->
+    <!-- 🤖 Agent 解读 -->
+    <view class="agent-card" wx:if="{{agent_insight}}">
+      <view class="agent-header">
+        <text class="agent-icon">🤖</text>
+        <view class="agent-title-row">
+          <text class="agent-title">AI 趋势解读</text>
+          <text class="agent-subtitle">基于近7天简报数据分析</text>
+        </view>
+      </view>
+      <text class="agent-text">{{agent_insight}}</text>
+      <view class="agent-meta">
+        <text class="agent-period">{{period}}</text>
+        <text class="agent-generated">{{generatedAt}}</text>
+      </view>
+    </view>
+
+    <!-- 🔥 飙升榜 -->
     <view class="trend-section" wx:if="{{rising.length}}">
-      <text class="section-label">🔥 热度飙升榜</text>
-      <view class="trend-item" wx:for="{{rising}}" wx:key="tag" bindtap="onTagTap" data-tag="{{item.tag}}">
-        <view class="trend-left">
-          <text class="trend-tag">{{item.label_zh}}</text>
-          <text class="trend-change up">↑{{item.change_pct}}%</text>
-        </view>
-        <view class="mini-chart">
-          <view class="mini-bar bar-rising" style="height: {{item.previous * 4 < 4 ? 4 : item.previous * 4}}px"></view>
-          <view class="mini-bar bar-rising" style="height: {{item.current * 4 > 40 ? 40 : item.current * 4}}px"></view>
+      <view class="section-header">
+        <text class="section-icon">🔥</text>
+        <text class="section-title">热度飙升榜</text>
+        <text class="section-sub">周涨幅</text>
+      </view>
+      <view wx:for="{{rising}}" wx:key="tag" class="trend-card rising-card" bindtap="onTagTap" data-tag="{{item.tag}}">
+        <view class="trend-rank rank-{{index + 1}}">{{index + 1}}</view>
+        <view class="trend-info">
+          <view class="trend-name-row">
+            <text class="trend-name">{{item.label_zh || item.tag}}</text>
+            <text class="trend-pct up">↑{{item.change_pct}}%</text>
+          </view>
+          <view class="trend-bar-row">
+            <view class="trend-bar-track">
+              <view class="trend-bar-fill up-fill" style="width: {{item.change_pct > 300 ? 100 : item.change_pct / 3}}%"></view>
+            </view>
+            <text class="trend-counts">{{item.previous}}条 → {{item.current}}条</text>
+          </view>
         </view>
       </view>
     </view>
 
-    <!-- ❄️ 热度降温榜 -->
+    <!-- ❄️ 降温榜 -->
     <view class="trend-section" wx:if="{{falling.length}}">
-      <text class="section-label">❄️ 热度降温榜</text>
-      <view class="trend-item" wx:for="{{falling}}" wx:key="tag" bindtap="onTagTap" data-tag="{{item.tag}}">
-        <view class="trend-left">
-          <text class="trend-tag">{{item.label_zh}}</text>
-          <text class="trend-change down">↓{{item.change_pct}}%</text>
-        </view>
-        <view class="mini-chart">
-          <view class="mini-bar bar-falling" style="height: {{item.previous * 4 < 4 ? 4 : item.previous * 4}}px"></view>
-          <view class="mini-bar bar-falling" style="height: {{item.current * 4 > 40 ? 40 : item.current * 4}}px"></view>
+      <view class="section-header">
+        <text class="section-icon">❄️</text>
+        <text class="section-title">热度降温榜</text>
+        <text class="section-sub">周跌幅</text>
+      </view>
+      <view wx:for="{{falling}}" wx:key="tag" class="trend-card falling-card" bindtap="onTagTap" data-tag="{{item.tag}}">
+        <view class="trend-rank rank-down">{{index + 1}}</view>
+        <view class="trend-info">
+          <view class="trend-name-row">
+            <text class="trend-name">{{item.label_zh || item.tag}}</text>
+            <text class="trend-pct down">↓{{item.change_pct}}%</text>
+          </view>
+          <view class="trend-bar-row">
+            <view class="trend-bar-track">
+              <view class="trend-bar-fill down-fill" style="width: {{-item.change_pct > 100 ? 100 : -item.change_pct}}%"></view>
+            </view>
+            <text class="trend-counts">{{item.previous}}条 → {{item.current}}条</text>
+          </view>
         </view>
       </view>
     </view>
 
     <!-- 🆕 新兴标签 -->
     <view class="trend-section" wx:if="{{new_tags.length}}">
-      <text class="section-label">🆕 新兴标签</text>
-      <view class="trend-item new-tag-item" wx:for="{{new_tags}}" wx:key="tag" bindtap="onTagTap" data-tag="{{item.tag}}">
-        <text class="trend-tag">{{item.label_zh}}</text>
-        <view class="new-badge">首次出现</view>
+      <view class="section-header">
+        <text class="section-icon">🆕</text>
+        <text class="section-title">新兴标签</text>
+        <text class="section-sub">本周首次出现</text>
+      </view>
+      <view class="new-tags-grid">
+        <view wx:for="{{new_tags}}" wx:key="tag" class="new-tag-card" bindtap="onTagTap" data-tag="{{item.tag}}">
+          <text class="new-tag-name">{{item.label_zh || item.tag}}</text>
+          <text class="new-tag-date">首次出现: {{item.first_seen}}</text>
+        </view>
       </view>
     </view>
 
     <!-- 空状态 -->
     <view wx:if="{{!rising.length && !falling.length && !new_tags.length}}" class="empty-state">
       <text class="empty-icon">📊</text>
-      <text class="empty-text">暂无趋势数据</text>
+      <text class="empty-text">暂无趋势数据，需要积累多天简报</text>
+    </view>
+
+    <!-- 底部提示 -->
+    <view class="trend-footer">
+      <text>数据每日自动更新 · 点击标签可搜索相关简报</text>
     </view>
   </view>
 </view>

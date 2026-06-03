@@ -36,12 +36,15 @@ Page({
     currentTab: "morning",
     briefing: null,
     dateText: "",
+    totalItems: 0,
+    headlineItem: {},
+    stats: {},
+    sectionsExpanded: {},
     loading: true,
     activeTags: [],
   },
 
   onLoad() {
-    // 初始化全局 activeTagSet
     if (!app.globalData.activeTagSet) app.globalData.activeTagSet = {};
     this.fetchLatest("morning");
   },
@@ -50,6 +53,9 @@ Page({
     const tags = app.globalData.userTags || wx.getStorageSync("userTags") || [];
     if (tags.join(",") !== (this.data.activeTags || []).join(",")) {
       this.setData({ activeTags: tags });
+      // 重新应用过滤
+      const type = this.data.currentTab;
+      this.fetchLatest(type);
     }
   },
 
@@ -68,29 +74,94 @@ Page({
     this.setData({ loading: true });
     try {
       const data = await api.getLatestBriefing(type);
-      // 顺便缓存标签供"我的"页使用
       cacheActiveTags(data);
+
       const tags = app.globalData.userTags || wx.getStorageSync("userTags") || [];
       const filtered = filterByTags(data, tags);
+
+      // 展开前2个 section，其余折叠
+      const expanded = {};
+      (filtered.sections || []).forEach((s, i) => {
+        expanded[i] = i < 2;
+      });
+
+      // 计算总条目数
+      const totalItems = (filtered.sections || []).reduce(
+        (sum, s) => sum + (s.items || []).length, 0
+      );
+
+      // 提取头条对应的原始 item（用于显示标签和分数）
+      let headlineItem = {};
+      const hlIndex = (filtered.headline || {}).item_index;
+      if (hlIndex != null) {
+        for (const sec of filtered.sections || []) {
+          for (const it of sec.items || []) {
+            if (it.score >= 8) { headlineItem = it; break; }
+          }
+          if (headlineItem.title) break;
+        }
+        if (!headlineItem.title) {
+          const allItems = [];
+          (filtered.sections || []).forEach(s => (s.items || []).forEach(i => allItems.push(i)));
+          headlineItem = allItems[hlIndex] || allItems[0] || {};
+        }
+      }
+
+      // 提取统计信息
+      const rawStats = data.raw_stats || {};
+      const stats = {
+        fetched: rawStats.fetched || 0,
+        scored: rawStats.scored || 0,
+        passed: rawStats.passed || 0,
+        final_count: rawStats.final_count || totalItems,
+        dedup_url_removed: rawStats.dedup_url_removed || 0,
+        dedup_semantic_removed: rawStats.dedup_semantic_removed || 0,
+        headline_title: (rawStats.headline || {}).title || "",
+      };
+
       this.setData({
         briefing: filtered,
         dateText: formatFullDate(data.date),
+        totalItems,
+        headlineItem,
+        stats,
+        sectionsExpanded: expanded,
         loading: false,
         activeTags: tags,
       });
     } catch (err) {
+      console.error("fetchLatest failed:", err);
       this.setData({ loading: false });
       wx.showToast({ title: "加载失败", icon: "none" });
     }
     wx.stopPullDownRefresh();
   },
 
-  applyFilter(tags) {
-    this.setData({ activeTags: tags });
+  onSectionToggle(e) {
+    const idx = e.currentTarget.dataset.index;
+    const key = String(idx);
+    this.setData({
+      [`sectionsExpanded.${key}`]: !this.data.sectionsExpanded[key],
+    });
   },
 
   onCardTap(e) {
-    const id = e.currentTarget.dataset.id;
-    wx.navigateTo({ url: `/pages/detail/detail?id=${id}` });
+    const id = e.currentTarget.dataset.id || (this.data.briefing && this.data.briefing.id);
+    if (id) {
+      wx.navigateTo({ url: `/pages/detail/detail?id=${id}` });
+    }
+  },
+
+  onArticleTap(e) {
+    const id = this.data.briefing && this.data.briefing.id;
+    if (id) {
+      wx.navigateTo({ url: `/pages/detail/detail?id=${id}` });
+    }
+  },
+
+  onMiniImageError(e) {
+    const { section, index } = e.currentTarget.dataset;
+    const path = `briefing.sections[${section}].items[${index}]._imgHide`;
+    this.setData({ [path]: true });
   },
 });

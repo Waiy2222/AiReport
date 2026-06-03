@@ -7,6 +7,8 @@ Page({
     falling: [],
     new_tags: [],
     agent_insight: "",
+    generatedAt: "",
+    totalTags: 0,
     loading: true,
     error: false,
   },
@@ -31,12 +33,32 @@ Page({
     this.setData({ loading: true, error: false });
     try {
       const data = await api.getWeeklyTrends();
+      const rising = data.rising || [];
+      const falling = data.falling || [];
+      const newTags = data.new_tags || [];
+
+      // 计算活跃标签总数
+      const allTagNames = new Set();
+      [...rising, ...falling, ...newTags].forEach(item => {
+        allTagNames.add(item.tag);
+      });
+      const totalTags = allTagNames.size;
+
+      // 格式化生成时间
+      let generatedAt = "";
+      if (data.generated_at) {
+        const d = new Date(data.generated_at);
+        generatedAt = `更新于 ${d.toLocaleString("zh-CN", { hour12: false })}`;
+      }
+
       this.setData({
         period: data.period || "",
-        rising: data.rising || [],
-        falling: data.falling || [],
-        new_tags: data.new_tags || [],
+        rising,
+        falling,
+        new_tags: newTags,
         agent_insight: data.agent_insight || "",
+        generatedAt,
+        totalTags,
         loading: false,
       });
     } catch (err) {

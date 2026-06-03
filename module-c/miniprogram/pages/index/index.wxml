@@ -5,46 +5,102 @@
       class="tab-item {{currentTab === 'morning' ? 'active' : ''}}"
       data-type="morning"
       bindtap="onTabTap"
-    >早报</view>
+    >☀️ 早报</view>
     <view
       class="tab-item {{currentTab === 'evening' ? 'active' : ''}}"
       data-type="evening"
       bindtap="onTabTap"
-    >晚报</view>
-  </view>
-
-  <!-- 日期标题 -->
-  <view wx:if="{{briefing}}" class="date-header">{{dateText}} · {{currentTab === 'morning' ? '早报' : '晚报'}}</view>
-
-  <!-- 标签过滤提示 -->
-  <view wx:if="{{activeTags.length > 0}}" class="filter-hint">
-    <text class="filter-icon">🏷️</text>
-    <text>已按兴趣过滤：</text>
-    <text class="filter-tags">{{activeTags.join('、')}}</text>
-    <text class="filter-count">（显示匹配内容）</text>
+    >🌙 晚报</view>
   </view>
 
   <!-- 加载中 -->
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:if="{{loading}}" class="loading">
+    <view class="loading-spinner"></view>
+    <text>加载最新简报中...</text>
+  </view>
 
-  <!-- TL;DR 卡片列表 -->
-  <block wx:if="{{briefing && !loading}}">
-    <view wx:if="{{briefing.tl_dr.length === 0}}" class="empty-state">暂无简报</view>
-    <view
-      wx:for="{{briefing.tl_dr}}"
-      wx:key="*this"
-      class="card tl-card"
-      data-id="{{briefing.id}}"
-      bindtap="onCardTap"
-    >
-      <view class="card-index">{{index + 1}}</view>
-      <view class="card-text">{{item}}</view>
-    </view>
-  </block>
-
-  <!-- 加载失败 -->
+  <!-- 无数据 -->
   <view wx:if="{{!briefing && !loading}}" class="empty-state">
-    <view>加载失败</view>
-    <button bindtap="fetchLatest" data-type="{{currentTab}}">重试</button>
+    <text class="empty-icon">📭</text>
+    <text>暂无{{currentTab === 'morning' ? '早报' : '晚报'}}</text>
+    <text class="empty-hint">下拉刷新试试</text>
+  </view>
+
+  <!-- 简报内容 -->
+  <view wx:if="{{briefing && !loading}}" class="briefing-content">
+
+    <!-- 日期 + 标签过滤提示 -->
+    <view class="date-row">
+      <text class="date-text">{{dateText}}</text>
+      <text class="item-count">{{totalItems}} 条精选</text>
+    </view>
+    <view wx:if="{{activeTags.length > 0}}" class="filter-banner">
+      🏷️ 已按兴趣过滤：<text class="fw600">{{activeTags.join('、')}}</text>
+    </view>
+
+    <!-- 🔥 头条卡片 -->
+    <view wx:if="{{briefing.headline && briefing.headline.title}}" class="headline-card" bindtap="onCardTap" data-id="{{briefing.id}}">
+      <view class="headline-badge">🔥 头条</view>
+      <view class="headline-title">{{briefing.headline.title}}</view>
+      <view class="headline-summary">{{briefing.headline.summary}}</view>
+      <view class="headline-tags">
+        <text wx:for="{{headlineItem.tags}}" wx:key="*this" class="htag">{{item}}</text>
+        <text class="htag score">{{headlineItem.score}}分</text>
+      </view>
+    </view>
+
+    <!-- 📰 分类区块 -->
+    <view wx:for="{{briefing.sections}}" wx:for-index="si" wx:key="section_title" class="section-card">
+      <view class="section-card-header" bindtap="onSectionToggle" data-index="{{si}}">
+        <view class="section-card-title">
+          <text class="section-num">{{si + 1}}</text>
+          <text>{{item.section_title}}</text>
+        </view>
+        <view class="section-card-meta">
+          <text class="section-count">{{item.items.length}}篇</text>
+          <text class="section-arrow {{sectionsExpanded[si] ? 'rotated' : ''}}">▾</text>
+        </view>
+      </view>
+
+      <!-- 展开后的条目列表 -->
+      <view wx:if="{{sectionsExpanded[si]}}" class="section-items">
+        <view wx:for="{{item.items}}" wx:for-item="article" wx:for-index="ai" class="article-mini" bindtap="onArticleTap" data-section="{{si}}" data-index="{{ai}}">
+          <image wx:if="{{article.image_url && !article._imgHide}}" src="{{article.image_url}}" mode="widthFix" class="article-thumb" lazy-load binderror="onMiniImageError" data-section="{{si}}" data-index="{{ai}}" />
+          <view class="article-body">
+            <view class="article-title">{{article.title}}</view>
+            <view class="article-summary">{{article.summary}}</view>
+            <view class="article-meta-row">
+              <text class="am-source">{{article.source}}</text>
+              <text wx:for="{{article.tags}}" wx:for-item="t" wx:key="*this" class="am-tag">{{t}}</text>
+              <text class="am-score">⭐{{article.score}}</text>
+            </view>
+            <!-- Phase 3: 辩论标记 -->
+            <view wx:if="{{article.debate}}" class="debate-badge-mini">🎭 AI三方观点</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 💡 关键趋势信号 -->
+    <view wx:if="{{briefing.key_takeaways && briefing.key_takeaways.length > 0}}" class="takeaways-card">
+      <view class="takeaways-header">💡 趋势信号</view>
+      <view wx:for="{{briefing.key_takeaways}}" wx:key="*this" class="takeaway-row">
+        <text class="takeaway-dot">{{index + 1}}</text>
+        <text>{{item}}</text>
+      </view>
+    </view>
+
+    <!-- 底部：查看完整简报 -->
+    <view class="bottom-actions">
+      <button class="btn-full" bindtap="onCardTap" data-id="{{briefing.id}}">📋 查看完整简报</button>
+    </view>
+
+    <!-- 统计信息 -->
+    <view class="stats-row">
+      <text class="stat-item">📊 原始抓取 {{stats.fetched}}条</text>
+      <text class="stat-item">✅ 评分通过 {{stats.passed}}条</text>
+      <text class="stat-item">🎯 最终精选 {{stats.final_count}}条</text>
+      <text wx:if="{{stats.headline_title}}" class="stat-item stat-headline">🔥 头条: {{stats.headline_title}}</text>
+    </view>
   </view>
 </view>

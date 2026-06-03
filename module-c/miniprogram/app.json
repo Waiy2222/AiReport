@@ -15,24 +15,32 @@
   "tabBar": {
     "color": "#999999",
     "selectedColor": "#4a90d9",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "今日简报"
+        "text": "今日简报",
+        "iconPath": "images/index.png",
+        "selectedIconPath": "images/index-active.png"
       },
       {
         "pagePath": "pages/history/history",
-        "text": "历史"
+        "text": "历史",
+        "iconPath": "images/history.png",
+        "selectedIconPath": "images/history-active.png"
       },
       {
         "pagePath": "pages/trends/trends",
         "text": "趋势",
-        "iconPath": "images/trend.png",
-        "selectedIconPath": "images/trend-active.png"
+        "iconPath": "images/trends.png",
+        "selectedIconPath": "images/trends-active.png"
       },
       {
         "pagePath": "pages/mine/mine",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "images/mine.png",
+        "selectedIconPath": "images/mine-active.png"
       }
     ]
   }

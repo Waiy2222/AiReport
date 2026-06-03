@@ -14,6 +14,7 @@ services:
       - ./contracts/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql
       - ./contracts/schema_v2.sql:/docker-entrypoint-initdb.d/03-schema_v2.sql
       - ./contracts/seed_data_v2.sql:/docker-entrypoint-initdb.d/04-seed_data_v2.sql
+      - ./contracts/schema_v3.sql:/docker-entrypoint-initdb.d/05-schema_v3.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

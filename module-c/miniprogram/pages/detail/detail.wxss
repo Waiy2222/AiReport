@@ -123,3 +123,98 @@
   padding: 6px 0;
   line-height: 1.6;
 }
+
+/* Phase 3: AI 三方观点辩论卡片 */
+.debate-card {
+  margin-top: 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.debate-header {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  background: #f5f3ff;
+  color: #6c5ce7;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.debate-views {
+  display: flex;
+  flex-direction: row;
+}
+
+.debate-view {
+  flex: 1;
+  padding: 8px 10px;
+  min-height: 80px;
+}
+
+.debate-view.debate-tech {
+  background: #f0f5ff;
+  border-right: 1px solid #e0e8f5;
+}
+
+.debate-view.debate-biz {
+  background: #fff8f0;
+  border-right: 1px solid #f0e8d8;
+}
+
+.debate-view.debate-social {
+  background: #f0fff4;
+}
+
+.debate-label {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.debate-tech .debate-label { color: #2e5c9e; }
+.debate-biz .debate-label { color: #c07830; }
+.debate-social .debate-label { color: #2e7d4f; }
+
+.debate-text {
+  font-size: 11px;
+  color: #555;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.controversy-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #fafafa;
+  border-top: 1px solid #e8e8e8;
+}
+
+.controversy-label {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.controversy-track {
+  flex: 1;
+  height: 6px;
+  background: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.controversy-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4ecb71, #fac858, #e8634a);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.controversy-value {
+  font-size: 11px;
+  color: #666;
+  flex-shrink: 0;
+}

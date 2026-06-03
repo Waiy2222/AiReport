@@ -180,8 +180,46 @@ MOCK_SUBSCRIPTIONS = [
 ]
 
 
+# Phase 3: Mock 辩论数据（给高分项注入三方观点）
+_MOCK_DEBATES = [
+    {
+        "tech_view": "MoE架构370B参数训到GPT-5同级仅$5M，这证明了高效训练路线可行。对开源社区是巨大推动，开发者无需依赖闭源API。",
+        "biz_view": "$5M训练成本意味着大模型门槛骤降90%。中小公司也能自训高性能模型，OpenAI/Anthropic的API定价权受到根本性挑战。",
+        "social_view": "超低训练成本可能引发AI滥用风险——恶意行为者也负担得起。但整体而言，技术民主化利大于弊，需要配套监管框架。",
+        "consensus": "三方均认同DeepSeek-V4是里程碑式突破",
+        "controversy": 3,
+    },
+    {
+        "tech_view": "MIT许可证+推理增强+GPT-5同级，Meta这次开源的诚意十足。RL-based reasoning路线和DeepSeek-R1互补，技术选型更丰富。",
+        "biz_view": "Meta用开源战略瓦解竞争对手的商业壁垒。Llama生态扩大意味着Meta可以后发制人，通过云服务和广告变现。",
+        "social_view": "开源模型进步让AI能力更普惠，但推理模型的误用风险（编造/欺骗）需要关注。MIT许可证意味着几乎无使用限制。",
+        "consensus": "三方一致看好Llama-4-R1开源对行业影响",
+        "controversy": 4,
+    },
+    {
+        "tech_view": "Agent原生API是重要方向——Gemini从被动响应转向主动执行。浏览器自动化+代码执行能力使其成为真正的数字助手。",
+        "biz_view": "Google借Agent切入企业自动化市场，与Microsoft Copilot正面竞争。搜索+Agent绑定可能成为新的商业护城河。",
+        "social_view": "Agent自主执行代码和浏览器操作引发安全担忧。Google需要透明度和安全沙箱机制，否则监管机构可能介入。",
+        "consensus": "三方认可Agent方向但安全顾虑不同",
+        "controversy": 5,
+    },
+]
+
+
+def _inject_mock_debate(briefing: dict) -> dict:
+    """为 mock 简报中的高分项注入辩论数据，模拟 Phase 3 辩论效果"""
+    debate_idx = 0
+    for section in briefing.get("sections", []):
+        for item in section.get("items", []):
+            if item.get("score", 0) >= 8.0 and debate_idx < len(_MOCK_DEBATES):
+                item["debate"] = _MOCK_DEBATES[debate_idx]
+                debate_idx += 1
+    return briefing
+
+
 def get_briefings():
-    return copy.deepcopy(BRIEFINGS)
+    briefings = copy.deepcopy(BRIEFINGS)
+    return [_inject_mock_debate(b) for b in briefings]
 
 
 def get_subscriptions():

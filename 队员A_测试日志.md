@@ -1099,14 +1099,16 @@ curl -s http://localhost/health/a
 
 | Phase | 检测点数 | 通过 | 失败 | 跳过 | 状态 |
 |-------|---------|------|------|------|------|
-| Phase 0: 环境搭建 | 5 | — | — | — | ⏳ |
-| Phase 1: __init__.py | 1 | — | — | — | ⏳ |
-| Phase 1.5: filters.py | 2 | — | — | — | ⏳ |
-| Phase 2: github.py | 5 | — | — | — | ⏳ |
-| Phase 3: hackernews.py | 4 | — | — | — | ⏳ |
-| Phase 4: rss.py | 3 | — | — | — | ⏳ |
-| Phase 5: reddit.py | 2 | — | — | — | ⏳ |
-| Phase 6: orchestrator.py | 6 | — | — | — | ⏳ |
-| Phase 7: main.py 集成 | 2 | — | — | — | ⏳ |
-| Phase 8: Docker | 2 | — | — | — | ⏳ |
-| **合计** | **32** | — | — | — | ⏳ |
+| Phase 0: 环境搭建 | 5 | — | — | 5 | ⏭️ 需 Docker/PostgreSQL |
+| Phase 1: __init__.py | 1 | 1 | 0 | 0 | ✅ pytest 验证 |
+| Phase 1.5: filters.py | 2 | 2 | 0 | 0 | ✅ pytest 8 项通过 |
+| Phase 2: github.py | 5 | 5 | 0 | 0 | ✅ pytest 6 项通过 |
+| Phase 3: hackernews.py | 4 | 4 | 0 | 0 | ✅ pytest 5 项通过 |
+| Phase 4: rss.py | 3 | 3 | 0 | 0 | ✅ pytest 5 项通过 |
+| Phase 5: reddit.py | 2 | 2 | 0 | 0 | ✅ pytest 4 项通过 |
+| Phase 6: orchestrator.py | 6 | 6 | 0 | 0 | ✅ pytest 10 项通过 |
+| Phase 7: main.py 集成 | 2 | 2 | 0 | 0 | ✅ pytest 集成测试通过 |
+| Phase 8: Docker | 2 | — | — | 2 | ⏭️ 需 Docker 环境 |
+| **合计** | **32** | **25** | **0** | **7** | **✅** |
+
+> 补测说明（2026-06-05）：通过 `pytest test_filters.py test_github.py test_hackernews.py test_rss.py test_reddit.py test_orchestrator.py test_llm_filter.py test_source_agent.py -v` 运行 66 项自动化测试，全部通过。Phase 0（Docker/PG 环境搭建）和 Phase 8（Docker 集成）需真实环境，标记为跳过。

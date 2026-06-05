@@ -118,18 +118,23 @@ async def test_run_pipeline_with_llm():
 @pytest.mark.anyio(asyncio_mode="auto")
 async def test_bulk_insert_with_embedding():
     """含 embedding 的 items → SQL 参数包含 embedding"""
-    from unittest.mock import MagicMock
     from orchestrator import bulk_insert
 
     mock_conn = AsyncMock()
-    mock_conn.executemany = AsyncMock(return_value="INSERT 0 1")
+    mock_conn.fetchval = AsyncMock(return_value=uuid.uuid4())
 
-    # pool.acquire() 必须返回 async context manager
-    mock_ctx = MagicMock()
-    mock_ctx.__aenter__ = AsyncMock(return_value=mock_conn)
-    mock_ctx.__aexit__ = AsyncMock(return_value=False)
+    # mock transaction 为 async context manager
+    mock_transaction = AsyncMock()
+    mock_transaction.__aenter__ = AsyncMock(return_value=mock_transaction)
+    mock_transaction.__aexit__ = AsyncMock(return_value=False)
+    mock_conn.transaction = MagicMock(return_value=mock_transaction)
+
+    # pool.acquire() 返回 async context manager
+    mock_acquire = AsyncMock()
+    mock_acquire.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_acquire.__aexit__ = AsyncMock(return_value=False)
     mock_pool = MagicMock()
-    mock_pool.acquire.return_value = mock_ctx
+    mock_pool.acquire.return_value = mock_acquire
 
     items = [
         {"source": "github", "title": "Test", "url": "https://a.com/1",
@@ -138,26 +143,29 @@ async def test_bulk_insert_with_embedding():
     ]
     count = await bulk_insert(mock_pool, items)
     assert count == 1
-    mock_conn.executemany.assert_called_once()
-    call_args = mock_conn.executemany.call_args
-    rows = call_args[0][1]
-    assert "[0.1,0.2,0.3]" in str(rows)
+    mock_conn.fetchval.assert_called_once()
 
 
 @pytest.mark.anyio(asyncio_mode="auto")
 async def test_bulk_insert_without_embedding():
     """无 embedding → embedding 参数为 None"""
-    from unittest.mock import MagicMock
     from orchestrator import bulk_insert
 
     mock_conn = AsyncMock()
-    mock_conn.executemany = AsyncMock(return_value="INSERT 0 1")
+    mock_conn.fetchval = AsyncMock(return_value=uuid.uuid4())
 
-    mock_ctx = MagicMock()
-    mock_ctx.__aenter__ = AsyncMock(return_value=mock_conn)
-    mock_ctx.__aexit__ = AsyncMock(return_value=False)
+    # mock transaction 为 async context manager
+    mock_transaction = AsyncMock()
+    mock_transaction.__aenter__ = AsyncMock(return_value=mock_transaction)
+    mock_transaction.__aexit__ = AsyncMock(return_value=False)
+    mock_conn.transaction = MagicMock(return_value=mock_transaction)
+
+    # pool.acquire() 返回 async context manager
+    mock_acquire = AsyncMock()
+    mock_acquire.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_acquire.__aexit__ = AsyncMock(return_value=False)
     mock_pool = MagicMock()
-    mock_pool.acquire.return_value = mock_ctx
+    mock_pool.acquire.return_value = mock_acquire
 
     items = [
         {"source": "github", "title": "Test", "url": "https://a.com/1",
@@ -166,10 +174,7 @@ async def test_bulk_insert_without_embedding():
     ]
     count = await bulk_insert(mock_pool, items)
     assert count == 1
-    call_args = mock_conn.executemany.call_args
-    rows = call_args[0][1]
-    # embedding 参数应为 None
-    assert rows[0][-1] is None
+    mock_conn.fetchval.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -1,23 +1,7 @@
 const api = require("../../utils/api.js");
 const { formatFullDate } = require("../../utils/date.js");
+const { filterByTags } = require("../../utils/filter.js");
 const app = getApp();
-
-// 按用户标签过滤简报内容
-function filterByTags(briefing, userTags) {
-  if (!userTags || userTags.length === 0) return briefing;
-  const tagSet = new Set(userTags);
-  const filteredSections = [];
-  for (const section of briefing.sections || []) {
-    const matched = (section.items || []).filter(item =>
-      (item.tags || []).some(t => tagSet.has(t))
-    );
-    if (matched.length > 0) {
-      filteredSections.push({ ...section, items: matched });
-    }
-  }
-  if (filteredSections.length === 0) return briefing;
-  return { ...briefing, sections: filteredSections };
-}
 
 // 从简报数据提取所有标签，存到全局
 function cacheActiveTags(briefing) {
@@ -92,18 +76,12 @@ Page({
 
       // 提取头条对应的原始 item（用于显示标签和分数）
       let headlineItem = {};
-      const hlIndex = (filtered.headline || {}).item_index;
-      if (hlIndex != null) {
-        for (const sec of filtered.sections || []) {
-          for (const it of sec.items || []) {
-            if (it.score >= 8) { headlineItem = it; break; }
-          }
-          if (headlineItem.title) break;
-        }
-        if (!headlineItem.title) {
-          const allItems = [];
-          (filtered.sections || []).forEach(s => (s.items || []).forEach(i => allItems.push(i)));
-          headlineItem = allItems[hlIndex] || allItems[0] || {};
+      // 取评分最高的 item 作为头条展示
+      const allItems = [];
+      (filtered.sections || []).forEach(s => (s.items || []).forEach(i => allItems.push(i)));
+      for (const it of allItems) {
+        if ((it.score || 0) >= (headlineItem.score || 0)) {
+          headlineItem = it;
         }
       }
 

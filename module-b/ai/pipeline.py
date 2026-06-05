@@ -442,20 +442,30 @@ async def _dedup_via_api(items: list[dict]) -> tuple[list[dict], int]:
 
 
 def _dedup_heuristic(items: list[dict]) -> tuple[list[dict], int]:
-    """Simple Jaccard-based dedup on title tokens (no API)."""
+    """Jaccard-based dedup on title tokens (Chinese 2-gram + English space-split)."""
+    import re as _re
     kept: list[dict] = []
     removed = 0
     seen_token_sets: list[set[str]] = []
 
     for it in items:
-        tokens = set(it["title"].lower().split())
+        title = it.get("title", "")
+        # Chinese: 2-gram tokens
+        cn_tokens = set()
+        clean = _re.sub(r'[，。、；：？！\s\n\r·"\'「」『』【】《》（）\(\)\[\]{}]', '', title)
+        for i in range(len(clean) - 1):
+            cn_tokens.add(clean[i:i+2])
+        # English: space-split + lowercase
+        en_tokens = set(title.lower().split())
+        tokens = cn_tokens | en_tokens
+
         is_dup = False
         for seen in seen_token_sets:
             if not tokens or not seen:
                 continue
             overlap = len(tokens & seen)
             union = len(tokens | seen)
-            if overlap / union > 0.35:  # more than 35% overlap → duplicate
+            if union > 0 and overlap / union > 0.25:  # lower threshold for mixed CN/EN
                 is_dup = True
                 break
         if is_dup:

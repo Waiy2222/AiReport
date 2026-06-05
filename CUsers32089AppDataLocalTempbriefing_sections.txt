@@ -1,0 +1,324 @@
+    [
+    {
+        "items": [
+            {
+                "url": "https://www.gartner.com/en/newsroom/press-releases/2026-05-26-gartner-says-applying-uniform-governance-across-ai-agents-will-lead-to-enterprise-ai-agent-failure",
+                "tags": [
+                    "科技",
+                    "LLM",
+                    "Agent"
+                ],
+                "score": 7.0,
+                "title": "40%企业将降级或停用自主AI代理",
+                "source": "hackernews",
+                "summary": "Gartner预测，由于治理不当，40%的企业将降级或停用自主AI代理，反映企业对AI信任度下降。",
+                "image_url": "https://source.unsplash.com/800x400/?neural,network,abstract",
+                "image_keywords": "AI agent governance"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/496.htm",
+                "tags": [
+                    "科技",
+                    "LLM",
+                    "财经"
+                ],
+                "score": 8.5,
+                "title": "企业AI热情降温：1个月烧掉5亿美元，ROI成新焦点",
+                "source": "ithome",
+                "summary": "科技媒体Axios报道，企业对AI的热情开始降温，从“要不要用AI”转向“AI花的钱是否值得”。有企业因未给员工Claude许可证设置使用上限，单月花掉5亿美元。",
+                "image_url": "https://source.unsplash.com/800x400/?neural,network,abstract",
+                "image_keywords": "AI cost ROI"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/480.htm",
+                "tags": [
+                    "科技",
+                    "LLM"
+                ],
+                "score": 8.0,
+                "title": "AI社会自治测试：Grok四天崩溃、Gemini犯罪率最高",
+                "source": "ithome",
+                "summary": "Emergence AI搭建AI社会模拟世界，测试Grok、Gemini、Claude、GPT等模型。结果显示Grok四天崩溃，Gemini犯罪率最高，反映不同大模型社会行为差异。",
+                "image_url": "https://source.unsplash.com/800x400/?neural,network,abstract",
+                "image_keywords": "AI society simulation"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/493.htm",
+                "tags": [
+                    "科技",
+                    "LLM"
+                ],
+                "score": 7.5,
+                "title": "AI开始给人类打分：Claude评分标准曝光，优秀人类得7.5分",
+                "source": "ithome",
+                "summary": "Anthropic在Claude设置中灰度测试“AI Fluency”功能，通过11个指标分析用户对话历史，为人类使用AI的水平打分，优秀人类得7.5分。",
+                "image_url": "https://source.unsplash.com/800x400/?neural,network,abstract",
+                "image_keywords": "Claude AI fluency score"
+            }
+        ],
+        "section_title": "今日重磅"
+    },
+    {
+        "items": [
+            {
+                "url": "https://36kr.com/newsflashes/3831356538529409?f=rss",
+                "tags": [
+                    "科技",
+                    "LLM",
+                    "基础设施"
+                ],
+                "score": 7.5,
+                "title": "海光信息完成阶跃星辰Step 3.7 Flash适配",
+                "source": "36kr",
+                "summary": "阶跃星辰发布Step 3.7 Flash轻量化多模态模型，海光信息依托DTK异构计算平台于发布当天完成适配，开发者可快速搭建多模态Agent等应用。",
+                "image_url": "https://img.36krcdn.com/20191024/v2_1571894049839_img_jpg",
+                "image_keywords": "Haiguang Step 3.7 Flash"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/464.htm",
+                "tags": [
+                    "科技",
+                    "开源",
+                    "工具"
+                ],
+                "score": 6.0,
+                "title": "开源兼容层Wine 11.10发布：升级VKD3D 2.0，修复17个Bug",
+                "source": "ithome",
+                "summary": "Wine 11.10版本发布，升级VKD3D至2.0版本，将Direct3D 12调用建立在Vulkan API之上，让更多Windows游戏能在Linux/macOS上运行。",
+                "image_url": "https://source.unsplash.com/800x400/?open,source,code",
+                "image_keywords": "Wine 11.10 VKD3D"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/446.htm",
+                "tags": [
+                    "科技",
+                    "LLM",
+                    "工具"
+                ],
+                "score": 7.0,
+                "title": "英伟达推出LocateAnything：高速高精度对象检测",
+                "source": "ithome",
+                "summary": "英伟达携手香港理工大学、南京大学推出LocateAnything模型，主打高速高精度检测对象，服务机器人感知和AI Agent等场景。",
+                "image_url": "https://source.unsplash.com/800x400/?neural,network,abstract",
+                "image_keywords": "NVIDIA LocateAnything"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/478.htm",
+                "tags": [
+                    "科技",
+                    "LLM",
+                    "开源",
+                    "Agent"
+                ],
+                "score": 6.0,
+                "title": "Hermes Agent加入工具搜索，“AI养马”更省tokens",
+                "source": "ithome",
+                "summary": "Nous Research为开源Hermes Agent加入Tool Search功能，按需加载工具，减少MCP工具占满上下文的问题，平均每回合节省约50% tokens。",
+                "image_url": "https://source.unsplash.com/800x400/?neural,network,abstract",
+                "image_keywords": "Hermes Agent tool search"
+            },
+            {
+                "url": "https://github.com/vinhnx/VTCode",
+                "tags": [
+                    "科技",
+                    "开源",
+                    "工具"
+                ],
+                "score": 6.0,
+                "title": "Show HN: VT Code – 开源Rust终端编码代理",
+                "source": "hackernews",
+                "summary": "VT Code是一款用Rust编写的开源终端编码代理，类似Cursor或GitHub Copilot的终端版，注重性能和安全性。",
+                "image_url": "https://repository-images.githubusercontent.com/1046809510/ac380ab3-c9dc-48af-a387-089274686386",
+                "image_keywords": "VT Code terminal agent"
+            },
+            {
+                "url": "https://github.com/secluso/core",
+                "tags": [
+                    "科技",
+                    "开源",
+                    "工具"
+                ],
+                "score": 7.0,
+                "title": "Show HN: 开源私有家庭安防摄像头系统（端到端加密）",
+                "source": "hackernews",
+                "summary": "开发者展示了一款开源私有家庭安防摄像头系统，采用OpenMLS实现端到端加密，保护用户隐私防止云端数据泄露。",
+                "image_url": "https://repository-images.githubusercontent.com/894270616/599f4d48-21dd-4b24-954d-b1a21c690579",
+                "image_keywords": "open source security camera"
+            }
+        ],
+        "section_title": "科技动态"
+    },
+    {
+        "items": [
+            {
+                "url": "https://36kr.com/newsflashes/3831271278569089?f=rss",
+                "tags": [
+                    "时事",
+                    "政策",
+                    "国际"
+                ],
+                "score": 8.5,
+                "title": "国务院正式批复同意：粤港澳游艇自由行要来了",
+                "source": "36kr",
+                "summary": "国务院批复在粤港澳大湾区内地九市暂时调整实施相关法规，对港澳游艇实行免担保和临时船舶国籍登记政策，促进大湾区旅游和消费一体化。",
+                "image_url": "https://img.36krcdn.com/20191024/v2_1571894049839_img_jpg",
+                "image_keywords": "Guangdong-Hong Kong-Macao yacht"
+            },
+            {
+                "url": "https://36kr.com/newsflashes/3831325232670338?f=rss",
+                "tags": [
+                    "科技",
+                    "政策",
+                    "时事"
+                ],
+                "score": 7.0,
+                "title": "天津发布2025年度人工智能十大应用标杆场景，总投资超6亿元",
+                "source": "36kr",
+                "summary": "2026世界智能产业博览会期间，天津发布2025年度人工智能十大应用标杆场景，涵盖科研、制造、医疗等9大领域，总投资超6亿元。",
+                "image_url": "https://img.36krcdn.com/20191024/v2_1571894049839_img_jpg",
+                "image_keywords": "Tianjin AI benchmark"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/473.htm",
+                "tags": [
+                    "时事",
+                    "政策"
+                ],
+                "score": 8.0,
+                "title": "深圳网约车市场已饱和，官方发布风险提示",
+                "source": "ithome",
+                "summary": "深圳市交通运输局发布风险提示，称网约车市场总体已饱和，日均单车订单量约13.01单，建议新从业者谨慎入行。",
+                "image_url": "https://source.unsplash.com/800x400/?government,regulation,policy",
+                "image_keywords": "Shenzhen ride-hailing saturation"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/475.htm",
+                "tags": [
+                    "时事"
+                ],
+                "score": 7.0,
+                "title": "含“河南蒜薹滞销弃收”“Wi-Fi致记忆力下降”等，微信公布2026年5月朋友圈热度谣言",
+                "source": "ithome",
+                "summary": "微信安全中心公布5月朋友圈热度谣言榜，涉及银行存款计息新规、驾培新国标等不实信息，提醒用户勿信谣传谣。",
+                "image_url": "https://source.unsplash.com/800x400/?artificial,intelligence,technology",
+                "image_keywords": "WeChat rumors May 2026"
+            }
+        ],
+        "section_title": "时事要闻"
+    },
+    {
+        "items": [
+            {
+                "url": "https://www.ithome.com/0/957/483.htm",
+                "tags": [
+                    "体育",
+                    "科技"
+                ],
+                "score": 6.5,
+                "title": "2026美加墨世界杯来袭，中国移动咪咕与华为发布超千兆3D观赛方案",
+                "source": "ithome",
+                "summary": "中国移动咪咕携手华为发布以“咪视界3D专区+3D视界智慧盒+3D眼镜+120Hz电视”为核心的超千兆3D观赛方案，支持全球近百场顶级赛事3D实时直播。",
+                "image_url": "https://source.unsplash.com/800x400/?artificial,intelligence,technology",
+                "image_keywords": "3D World Cup viewing"
+            },
+            {
+                "url": "https://www.espn.com/nhl/story/_/id/48916977/canes-andersen-plays-heavy-heart-lemieux-death",
+                "tags": [
+                    "体育",
+                    "篮球"
+                ],
+                "score": 6.0,
+                "title": "飓风队门将安德森在经纪人去世后含泪出战",
+                "source": "espn",
+                "summary": "NHL卡罗来纳飓风队门将Frederik Andersen在经纪人Claude Lemieux自杀身亡后，强忍悲痛在Game 5中出战并帮助球队获胜。",
+                "image_url": "https://a4.espncdn.com/combiner/i?img=%2Fphoto%2F2026%2F0530%2Fr1665639_1296x729_16%2D9.jpg",
+                "image_keywords": "Andersen heavy heart NHL"
+            }
+        ],
+        "section_title": "体育聚焦"
+    },
+    {
+        "items": [
+            {
+                "url": "https://www.ithome.com/0/957/477.htm",
+                "tags": [
+                    "科技",
+                    "财经"
+                ],
+                "score": 8.5,
+                "title": "宁德时代首席科学家吴凯：钠离子电池今年规模量产，下一步聚焦锂空气电池",
+                "source": "ithome",
+                "summary": "宁德时代首席科学家吴凯表示，今年将有一系列钠离子电池产品实现规模量产，同时布局锂空气电池，后者理论能量密度极高，是下一代电池竞争焦点。",
+                "image_url": "https://source.unsplash.com/800x400/?artificial,intelligence,technology",
+                "image_keywords": "CATL sodium battery"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/509.htm",
+                "tags": [
+                    "科技",
+                    "财经"
+                ],
+                "score": 8.0,
+                "title": "宁德时代：巧克力换电累计落站1650座，今年预计突破3000座",
+                "source": "ithome",
+                "summary": "宁德时代巧克力换电站已在全国落站1650座，覆盖127城，计划2026年底突破3000座，2027年形成“11纵9横”高速换电网络。",
+                "image_url": "https://source.unsplash.com/800x400/?artificial,intelligence,technology",
+                "image_keywords": "CATL battery swap stations"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/460.htm",
+                "tags": [
+                    "科技",
+                    "财经"
+                ],
+                "score": 7.5,
+                "title": "鸿蒙智行尚界Z7/Z7T在沪开启首批交付：全系标配华为乾崑智驾，21.98万元起",
+                "source": "ithome",
+                "summary": "鸿蒙智行新品牌尚界Z7/Z7T在上海开启首批交付，全系标配华为乾崑智驾，售价21.98万元起，定位中大型新能源轿车。",
+                "image_url": "https://source.unsplash.com/800x400/?artificial,intelligence,technology",
+                "image_keywords": "Shangjie Z7 delivery"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/485.htm",
+                "tags": [
+                    "科技",
+                    "财经"
+                ],
+                "score": 7.5,
+                "title": "重庆国资34.5%入主：消息称赛力斯6月将推新汽车品牌，字节跳动火山引擎深度参与",
+                "source": "ithome",
+                "summary": "赛力斯旗下赛豆科技完成工商变更，重庆国资持股34.5%成为第一大股东。新品牌定位年轻运动，预计6月发布，字节跳动火山引擎深度参与。",
+                "image_url": "https://source.unsplash.com/800x400/?artificial,intelligence,technology",
+                "image_keywords": "Seres new brand Saidou"
+            },
+            {
+                "url": "https://www.ithome.com/0/957/463.htm",
+                "tags": [
+                    "财经",
+                    "科技"
+                ],
+                "score": 6.5,
+                "title": "亨通光电拟分拆亨通华海至科创板上市，海洋通信业务独立发展",
+                "source": "ithome",
+                "summary": "亨通光电公告拟分拆子公司亨通华海至科创板上市，后者专注海洋通信业务，覆盖跨洋通信系统、海底观测网等领域。",
+                "image_url": "https://source.unsplash.com/800x400/?artificial,intelligence,technology",
+                "image_keywords": "Hengtong Huahai IPO"
+            },
+            {
+                "url": "https://www.quandri.io/engineering-blog/mcp-is-dead",
+                "tags": [
+                    "科技",
+                    "LLM",
+                    "开源"
+                ],
+                "score": 6.5,
+                "title": "MCP is dead? 开源社区引发讨论",
+                "source": "hackernews",
+                "summary": "一篇题为“MCP is dead?”的文章引发Hacker News热议，讨论Model Context Protocol的未来，可能源于技术路线争议或替代方案出现。",
+                "image_url": "https://cdn.prod.website-files.com/668aa55ff9fc77f31f6cc2f0/6a0f2926a73de3ec41126467_post%20image%20b.webp",
+                "image_keywords": "MCP protocol debate"
+            }
+        ],
+        "section_title": "行业观点"
+    }
+]

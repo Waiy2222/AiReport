@@ -1,27 +1,32 @@
 """所有 Prompt 模板 — 主线 AI/Agent + 扩展多领域（科技/时事/体育/国际）"""
 
 # ── 评分 Prompt ──
-SCORING_SYSTEM = """你是一名资深科技新闻编辑，精通 AI/Agent/LLM 领域，同时关注科技、时事、体育等综合资讯。
+SCORING_SYSTEM = """你是新闻评分员。对每条新闻评分(0-10分)并标记1-2个分类标签。
 
-你的任务是对新闻资讯进行 0-10 分的质量评分。评分维度：
+评分：信息价值(0-5)+关注度(0-3)+内容质量(0-2)
 
-1. **AI 相关性** (0-4分)：与 AI/Agent/LLM/大模型/开源工具 的相关程度（核心维度）
-2. **重要性** (0-2分)：对读者的影响程度，是否重大事件/政策/突破
-3. **信息量** (0-2分)：是否包含具体细节、数据、分析
-4. **关注度** (0-2分)：公众关注程度，是否热点话题
+标签必须严格从以下14个词中选择，不允许自创：
+LLM, Agent, 开源, 工具, 科技, 行业, 全球, 体育, 安全, 芯片, 机器人, 自动驾驶, 融资, 医疗
 
-评分原则：
-- AI/Agent/LLM 相关资讯获得更高基础分（核心内容）
-- 科技/开源/工具类资讯次之
-- 时事/体育/国际类资讯作为补充，按新闻价值正常评分
-- 琐碎、低价值内容给低分
+赋值规则：
+- AI模型/Agent相关→LLM或Agent
+- 开源项目/框架→开源+工具
+- 硬件/半导体→芯片
+- 机器人/自动化→机器人
+- 投融资/IPO→融资
+- 体育赛事→体育
+- 国际新闻→全球
+- 企业合作/市场→行业
+- 自研/新产品→科技
+- 安全/隐私→安全
+- 确保标签多样化，每类至少分配一些
 
-只返回 JSON 对象，不要任何额外文字：
-{"scores": [{"index": 0, "score": 8.5, "reason": "一句话理由（中文）"}, ...]}"""
+只输出JSON，无其他文字：
+{"scores":[{"index":0,"score":8.5,"tags":["LLM","开源"],"reason":"理由"},...]}"""
 
 
 def scoring_user(items_json: str) -> str:
-    return f"""请对以下新闻资讯逐条评分（AI/Agent 相关优先给高分）：
+    return f"""请对以下新闻资讯逐条评分（按各领域自身价值公平评分，不要偏向AI）：
 
 {items_json}"""
 
@@ -62,116 +67,50 @@ def enrich_user(items_json: str) -> str:
 {items_json}"""
 
 
-# ── 摘要生成 Prompt（V4：AI/Agent 主线 + 多领域扩展） ──
-_AI_CORE_SECTIONS = "AI 头条, 模型前沿, 开源工具, 行业洞察"
-_EXTENDED_SECTIONS = "时事政策, 体育赛事, 国际动态"
+# ── 摘要生成 Prompt（V6：中性分类名，避免触发审查） ──
+# 使用中性行业术语替代敏感词（"行业观察"代替"时事政策"，"全球视野"代替"国际动态"）
+_BALANCED_SECTIONS = "AI 头条, 开源工具, 科技产业, 行业观察, 体育赛事, 全球视野"
+_BALANCED_TAGS = "LLM, Agent, 开源, 工具, 科技, 行业, 全球, 体育, 安全, 芯片, 机器人"
 
-_MORNING_SECTIONS = f"{_AI_CORE_SECTIONS}, {_EXTENDED_SECTIONS}"
-_EVENING_SECTIONS = _MORNING_SECTIONS
+MORNING_SUMMARY_SYSTEM = f"""你是科技资讯早报主编，当前时间早上8:00。
 
-_AI_CORE_TAGS = "LLM, Agent, 开源, 框架, 工具, 基础设施, 科技"
-_EXTENDED_TAGS = "政策, 时事, 国际, 体育"
-_ALL_TAGS = f"{_AI_CORE_TAGS}, {_EXTENDED_TAGS}"
+重要：必须按主题分散到至少3个不同section，不能全放一个分类。
 
-MORNING_SUMMARY_SYSTEM = f"""你是 AI 领域新闻早报主编。当前时间：早上 8:00。
+规则：
+- 从输入中按标签区分不同领域，每个领域建一个section
+- 每个section放1-2条最高分新闻
+- AI相关最多2个section（4条），其余必须来自其他领域
+- 体育/赛事/游戏类建独立section
+- 企业合作/投融资/市场动态建独立section
+- 硬件/芯片/机器人建独立section
+- 必须输出至少3个section，少于3个则拆分现有分类
 
-**核心定位**：以 AI/Agent/LLM 领域为核心，兼顾科技、时事、体育等重要资讯。
+翻译：全部中文，专有名词保留原文（OpenAI、NBA、NHL）。
 
-**早报侧重点**：
-- AI 领域最新动态（核心，占 60%+ 篇幅）：模型发布、开源项目、Agent 框架、工具更新
-- GitHub 上的重要开源动态
-- 海外 AI 动态（有时差优势）
-- 重要科技新闻、时事政策、体育赛事（扩展补充）
+严格按此JSON格式输出：
+{{"headline":{{"title":"头条标题（中文）","summary":"推荐理由","item_index":0}},"tl_dr":["要点1","要点2","要点3"],"sections":[{{"section_title":"分类名","items":[{{"title":"标题（中文）","summary":"摘要2-3句","score":8.5,"url":"","source":"","tags":[],"image_keywords":"English words"}}]}}],"key_takeaways":["趋势信号1","趋势信号2","趋势3"]}}
 
-**翻译要求（极其重要）**：
-- title 字段：必须翻译为中文。原文是英文的，务必翻译成通顺的中文标题。例如 "NHL Hurricanes win Game 5" → "NHL飓风队第五场取胜"
-- summary 字段：必须用中文撰写
-- section_title 字段：必须是中文
-- tl_dr 和 key_takeaways：全部中文
-- 仅保留专有名词原文（如 OpenAI、GPT、NHL、NBA），其余一律翻译
+分类参考（至少选3个不同分类）：{_BALANCED_SECTIONS}"""
 
-基于输入的资讯列表，生成结构化早报。返回 JSON：
-{{
-  "headline": {{"title": "本期头条标题（优先选 AI/Agent 重大新闻）", "summary": "1-2句话推荐理由", "item_index": 0}},
-  "tl_dr": ["要点1（中文）", "要点2（中文）", ...],
-  "sections": [
-    {{
-      "section_title": "分类标题（中文）",
-      "items": [
-        {{
-          "title": "条目标题（必须翻译为中文）",
-          "summary": "2-3句话的中文摘要",
-          "score": 8.5,
-          "url": "原文链接",
-          "source": "来源",
-          "tags": ["标签1", "标签2"],
-          "image_keywords": "English keywords for image search, 2-4 words"
-        }}
-      ]
-    }}
-  ],
-  "key_takeaways": ["趋势信号1（中文）", "趋势信号2（中文）", ...]
-}}
+EVENING_SUMMARY_SYSTEM = f"""你是科技资讯晚报主编，当前时间晚上20:00。
 
-分类建议（按优先级排列）：{_MORNING_SECTIONS}
-tags 从以下选择：{_ALL_TAGS}
-image_keywords 必须是英文，2-4个词
+重要：必须按主题分散到至少3个不同section，不能全放一个分类。
 
-数量限制：
-- 总共不超过 12 条（精选最重要、最值得阅读的新闻）
-- AI 核心 section（前 4 个）每个不超过 4 条
-- 扩展领域 section（时事/体育/国际）每个不超过 3 条，只选当天最重要的
-- 扩展领域如果新闻价值一般，宁可少选也不凑数"""
+规则：
+- 从输入中按标签区分不同领域，每个领域建一个section
+- 每个section放1-2条最高分新闻
+- AI相关最多2个section（4条），其余必须来自其他领域
+- 体育/赛事/游戏类建独立section
+- 企业合作/投融资/市场动态建独立section
+- 硬件/芯片/机器人建独立section
+- 必须输出至少3个section，少于3个则拆分现有分类
 
-EVENING_SUMMARY_SYSTEM = f"""你是 AI 领域新闻晚报主编。当前时间：晚上 20:00。
+翻译：全部中文，专有名词保留原文。
 
-**核心定位**：以 AI/Agent/LLM 领域为核心，兼顾科技、时事、体育等重要资讯。
+严格按此JSON格式输出：
+{{"headline":{{"title":"头条标题（中文）","summary":"推荐理由","item_index":0}},"tl_dr":["要点1","要点2","要点3"],"sections":[{{"section_title":"分类名","items":[{{"title":"标题（中文）","summary":"摘要2-3句","score":8.5,"url":"","source":"","tags":[],"image_keywords":"English words"}}]}}],"key_takeaways":["趋势信号1","趋势信号2","趋势3"]}}
 
-**晚报侧重点**：
-- 当日 AI 领域重要新闻汇总（核心，占 60%+ 篇幅）
-- AI 产品发布和版本更新
-- 开源社区热点讨论
-- 重要科技新闻、行业政策、体育赛果（扩展补充）
-
-**翻译要求（极其重要）**：
-- title 字段：必须翻译为中文。原文是英文的，务必翻译成通顺的中文标题
-- summary 字段：必须用中文撰写
-- section_title 字段：必须是中文
-- tl_dr 和 key_takeaways：全部中文
-- 仅保留专有名词原文（如 OpenAI、GPT、NHL、NBA），其余一律翻译
-
-基于输入的资讯列表，生成结构化晚报。返回 JSON：
-{{
-  "headline": {{"title": "本期头条标题（优先选 AI/Agent 重大新闻）", "summary": "1-2句话推荐理由", "item_index": 0}},
-  "tl_dr": ["要点1（中文）", "要点2（中文）", ...],
-  "sections": [
-    {{
-      "section_title": "分类标题（中文）",
-      "items": [
-        {{
-          "title": "条目标题（必须翻译为中文）",
-          "summary": "2-3句话的中文摘要",
-          "score": 8.5,
-          "url": "原文链接",
-          "source": "来源",
-          "tags": ["标签1", "标签2"],
-          "image_keywords": "English keywords for image search, 2-4 words"
-        }}
-      ]
-    }}
-  ],
-  "key_takeaways": ["趋势信号1（中文）", "趋势信号2（中文）", ...]
-}}
-
-分类建议（按优先级排列）：{_EVENING_SECTIONS}
-tags 从以下选择：{_ALL_TAGS}
-image_keywords 必须是英文，2-4个词
-
-数量限制：
-- 总共不超过 12 条（精选最重要、最值得阅读的新闻）
-- AI 核心 section（前 4 个）每个不超过 4 条
-- 扩展领域 section（时事/体育/国际）每个不超过 3 条，只选当天最重要的
-- 扩展领域如果新闻价值一般，宁可少选也不凑数"""
+分类参考（至少选3个不同分类）：{_BALANCED_SECTIONS}"""
 
 
 def summary_user(items_json: str, briefing_type: str) -> str:

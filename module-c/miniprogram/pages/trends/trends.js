@@ -3,14 +3,14 @@ const api = require("../../utils/api.js");
 Page({
   data: {
     period: "",
-    rising: [],
-    falling: [],
-    new_tags: [],
-    agent_insight: "",
+    timeline: [],
+    hotTags: [],
+    totalEvents: 0,
+    weeklyCommentary: "",
     generatedAt: "",
-    totalTags: 0,
     loading: true,
     error: false,
+    expandedDays: {},  // 记录哪些天展开了
   },
 
   onLoad() {
@@ -29,22 +29,36 @@ Page({
     });
   },
 
+  onEventTap(e) {
+    const url = e.currentTarget.dataset.url;
+    if (!url) return;
+    // 复制链接到剪贴板
+    wx.setClipboardData({
+      data: url,
+      success: () => wx.showToast({ title: "链接已复制", icon: "success" }),
+    });
+  },
+
+  // 折叠/展开某天的事件
+  onDayToggle(e) {
+    const date = e.currentTarget.dataset.date;
+    const expanded = { ...this.data.expandedDays };
+    expanded[date] = !expanded[date];
+    this.setData({ expandedDays: expanded });
+  },
+
   async fetchTrends() {
     this.setData({ loading: true, error: false });
     try {
       const data = await api.getWeeklyTrends();
-      const rising = data.rising || [];
-      const falling = data.falling || [];
-      const newTags = data.new_tags || [];
+      const timeline = data.daily_timeline || [];
+      const hotTags = data.hot_tags || [];
 
-      // 计算活跃标签总数
-      const allTagNames = new Set();
-      [...rising, ...falling, ...newTags].forEach(item => {
-        allTagNames.add(item.tag);
-      });
-      const totalTags = allTagNames.size;
+      // 默认展开今天和昨天
+      const expandedDays = {};
+      if (timeline.length > 0) expandedDays[timeline[timeline.length - 1].date] = true;
+      if (timeline.length > 1) expandedDays[timeline[timeline.length - 2].date] = true;
 
-      // 格式化生成时间
       let generatedAt = "";
       if (data.generated_at) {
         const d = new Date(data.generated_at);
@@ -53,12 +67,12 @@ Page({
 
       this.setData({
         period: data.period || "",
-        rising,
-        falling,
-        new_tags: newTags,
-        agent_insight: data.agent_insight || "",
+        timeline,
+        hotTags,
+        totalEvents: data.total_events || 0,
+        weeklyCommentary: data.weekly_commentary || "",
         generatedAt,
-        totalTags,
+        expandedDays,
         loading: false,
       });
     } catch (err) {

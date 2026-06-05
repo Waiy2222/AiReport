@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from pipeline import VideoPipeline
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [F:%(name)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Module F - Video Generator")
@@ -124,7 +125,24 @@ async def get_status(video_id: str):
     except Exception:
         raise HTTPException(404, f"video not found: {video_id}")
 
-    return StatusResponse(**info)
+    # Map DB fields to StatusResponse model
+    import json
+    meta = info.get("metadata")
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except (json.JSONDecodeError, TypeError):
+            meta = None
+
+    return StatusResponse(
+        video_id=str(info.get("id", video_id)),
+        status=info.get("status", "unknown"),
+        title=info.get("title"),
+        output_path=info.get("output_path"),
+        duration_seconds=info.get("duration_seconds"),
+        error_msg=info.get("error_msg"),
+        metadata=meta if isinstance(meta, dict) else None,
+    )
 
 
 @app.get("/videos")

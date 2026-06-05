@@ -601,7 +601,7 @@ async def recommend_sources(pool=None) -> list[dict]:
 
 
 async def get_sources_health(pool) -> list[dict]:
-    """获取每个标签的信源健康度（覆盖率 + 推荐数量）。
+    """获取每个标签的信源健康度（从 briefings 表统计实际产出的标签覆盖率）。
 
     返回: [{tag, label_zh, count, health, recommendations_pending}]
         health: "green" (>=5), "yellow" (2-4), "red" (<2)
@@ -610,18 +610,30 @@ async def get_sources_health(pool) -> list[dict]:
 
     tags = await pool.fetch("SELECT tag, label_zh FROM tag_catalog ORDER BY sort_order")
 
-    # 批量获取所有 tag 的覆盖率
+    # 从 briefings 表批量统计每个标签的出现次数（briefings 有完整的 tags）
     result = []
     for row in tags:
         tag = row["tag"]
         label_zh = row["label_zh"]
 
-        count = await pool.fetchval(
-            """SELECT COUNT(*) FROM raw_items
-               WHERE fetched_at >= $1 AND metadata->'tags' ? $2""",
+        # 从 briefings.sections 中统计包含该标签的 item 数
+        rows = await pool.fetch(
+            """SELECT sections FROM briefings
+               WHERE date >= $1 AND language = 'zh'""",
             cutoff,
-            tag,
         )
+        count = 0
+        for r in rows:
+            sections = r["sections"]
+            if isinstance(sections, str):
+                import json
+                sections = json.loads(sections)
+            if not isinstance(sections, list):
+                continue
+            for section in sections:
+                for item in (section.get("items") or []):
+                    if tag in (item.get("tags") or []):
+                        count += 1
 
         # 健康度分档
         if count >= 5:

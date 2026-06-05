@@ -1,8 +1,10 @@
+const config = require("./utils/config.js");
+
 App({
   globalData: {
     openid: "",
     userTags: [],
-    baseUrl: "http://localhost:8003",
+    baseUrl: config.baseUrl,
   },
 
   onLaunch() {

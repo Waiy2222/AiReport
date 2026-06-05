@@ -1,7 +1,9 @@
 """Module D — 多平台发布 + 长图生成 (:8004)"""
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import json
 import logging
-import os
 import uuid
 from pathlib import Path
 

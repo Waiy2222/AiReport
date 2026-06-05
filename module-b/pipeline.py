@@ -66,13 +66,17 @@ async def _insert_briefing(conn, briefing_type: str, briefing_date: str,
     final_count = sum(len(s.get("items", [])) for s in briefing.get("sections", []))
 
     if final_count == 0:
-        # 检查是否已有有效数据，避免空跑覆盖
         existing = await conn.fetchrow(
             "SELECT id FROM briefings WHERE type=$1 AND date=$2 AND language='zh'",
             briefing_type, briefing_date,
         )
-        if existing:
+        # BUG-004 fix: 如果评分阶段有数据（passed>0）但最终 sections 为空，
+        # 说明摘要失败，仍需更新 DB 让用户看到"摘要生成中"而非过时数据
+        if existing and stats.get("passed", 0) == 0:
             return existing["id"]
+        # passed>0 但 final_count=0 → 摘要失败，创建新记录或用原文兜底
+        if stats.get("passed", 0) > 0:
+            merged_stats["draft_mode"] = True  # 标记为草稿（摘要在后续重试中补全）
 
     actual_id = await conn.fetchval(
         "INSERT INTO briefings (id, type, date, tl_dr, sections, key_takeaways, raw_stats) "

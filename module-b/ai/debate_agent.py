@@ -5,7 +5,7 @@
   - Biz-Agent（商业派）：商业价值、市场影响、融资信号
   - Social-Agent（社会派）：社会影响、监管风险、伦理考量
 
-策略：只对 ai_score >= 8 的 Top 新闻跑辩论，控制成本。
+策略：只对 Agent/智能体标签的新闻跑辩论，每次简报最多 3 条。
 辩论失败时静默回退，不阻塞主流水线。
 """
 import asyncio
@@ -22,8 +22,12 @@ from .prompts import (
 
 logger = logging.getLogger(__name__)
 
-# 辩论阈值：只对 8 分以上新闻跑辩论
-DEBATE_THRESHOLD = 8
+# 只辩论 Agent/智能体 领域的新闻
+DEBATE_TAG = "Agent"
+# 每次简报最多辩论条数
+DEBATE_MAX_COUNT = 3
+# 辩论阈值：评分低于此值的 Agent 新闻不辩论
+DEBATE_THRESHOLD = 6
 
 # 角色配置: (角色名, system_prompt, 视角缩写)
 PERSONAS = [
@@ -106,26 +110,35 @@ async def _debate_single(item: dict) -> dict:
 
 
 async def run_debate(items: list[dict]) -> list[dict]:
-    """主入口：对每条高优先级新闻跑 3 个 Agent 辩论
+    """主入口：只对 Agent/智能体 标签的新闻跑三方辩论，最多 3 条
 
     Args:
-        items: 已评分的新闻列表（需含 ai_score 字段）
+        items: 已评分的新闻列表（需含 ai_score + tags 字段）
 
     Returns:
-        传入的 items，高分的 item["metadata"]["debate"] 已填充辩论结果
+        传入的 items，Agent 新闻的 item["metadata"]["debate"] 已填充辩论结果
     """
-    # 只对 ai_score >= 8 的 Top 新闻跑辩论
-    debate_items = [it for it in items if it.get("ai_score", 0) >= DEBATE_THRESHOLD]
+    # ① 筛选：只取 Agent 标签 + 评分 ≥ 阈值的新闻
+    agent_items = [
+        it for it in items
+        if DEBATE_TAG in (it.get("tags") or [])
+        and it.get("ai_score", 0) >= DEBATE_THRESHOLD
+    ]
+
+    # ② 按评分降序，取前 DEBATE_MAX_COUNT 条
+    agent_items.sort(key=lambda x: x.get("ai_score", 0), reverse=True)
+    debate_items = agent_items[:DEBATE_MAX_COUNT]
 
     if not debate_items:
-        logger.info("No items reach debate threshold (score >= %d)", DEBATE_THRESHOLD)
+        logger.info(
+            "Debate skipped: no Agent-tagged items above threshold %d",
+            DEBATE_THRESHOLD,
+        )
         return items
 
     logger.info(
-        "Starting debate for %d/%d items (threshold >= %d)",
-        len(debate_items),
-        len(items),
-        DEBATE_THRESHOLD,
+        "Starting debate for %d Agent-tagged items (max=%d, threshold >= %d, total items=%d)",
+        len(debate_items), DEBATE_MAX_COUNT, DEBATE_THRESHOLD, len(items),
     )
 
     # 并行对所有高分新闻跑辩论

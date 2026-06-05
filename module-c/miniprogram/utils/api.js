@@ -1,9 +1,11 @@
+const config = require("./config.js");
 const app = getApp();
 
 function request(url, method = "GET", data = null) {
+  const baseUrl = app.globalData.baseUrl || config.baseUrl;
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${app.globalData.baseUrl}${url}`,
+      url: `${baseUrl}${url}`,
       method,
       data,
       header: {

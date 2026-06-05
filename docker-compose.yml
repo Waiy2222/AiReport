@@ -1,7 +1,20 @@
+# ================================================================
+# AI 资讯早报 — Docker Compose（生产环境）
+# ================================================================
+# 完整启动（不含视频模块）：
+#   docker compose up -d
+#
+# 视频模块本地运行，不部署云端，已用 profiles 排除：
+#   docker compose --profile video up -d   # 如需在云端调试视频
+# ================================================================
+
 services:
-  # Phase 2: pgvector 替代原生 postgres
+  # ══════════════════════════════════════════════════════════
+  # PostgreSQL (pgvector) 数据库
+  # ══════════════════════════════════════════════════════════
   postgres:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ai_news}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -16,15 +29,24 @@ services:
       - ./contracts/seed_data_v2.sql:/docker-entrypoint-initdb.d/04-seed_data_v2.sql
       - ./contracts/schema_v3.sql:/docker-entrypoint-initdb.d/05-schema_v3.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ══════════════════════════════════════════════════════════
+  # 模块 A — 资讯抓取 / RSS 聚合 (:8001)
+  # ══════════════════════════════════════════════════════════
   module-a:
     build:
       context: .
       dockerfile: ./module-a/Dockerfile
+    restart: unless-stopped
     ports:
       - "8001:8001"
     environment:
@@ -36,9 +58,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ══════════════════════════════════════════════════════════
+  # 模块 B — AI 内容加工 / 长图生成 (:8002)
+  # ══════════════════════════════════════════════════════════
   module-b:
     build: ./module-b
+    restart: unless-stopped
     ports:
       - "8002:8002"
     environment:
@@ -49,9 +86,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ══════════════════════════════════════════════════════════
+  # 模块 C — 微信小程序 + 公众号后端 (:8003)
+  # ══════════════════════════════════════════════════════════
   module-c:
     build: ./module-c/backend
+    restart: unless-stopped
     ports:
       - "8003:8003"
     environment:
@@ -62,13 +114,28 @@ services:
       WEIXIN_OA_APPID: ${WEIXIN_OA_APPID:-}
       WEIXIN_OA_SECRET: ${WEIXIN_OA_SECRET:-}
       WEIXIN_OA_TOKEN: ${WEIXIN_OA_TOKEN:-}
-      H5_BASE_URL: ${H5_BASE_URL:-http://localhost:8003/h5}
+      H5_BASE_URL: ${H5_BASE_URL:-https://vcast.asia/h5}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ══════════════════════════════════════════════════════════
+  # 模块 D — 多平台发布 (:8004)
+  # ══════════════════════════════════════════════════════════
   module-d:
     build: ./module-d
+    restart: unless-stopped
     ports:
       - "8004:8004"
     environment:
@@ -82,13 +149,29 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8004/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ══════════════════════════════════════════════════════════
+  # 模块 E — Dashboard + 调度管理 (:8005)
+  # ══════════════════════════════════════════════════════════
   module-e:
     build: ./module-e
+    restart: unless-stopped
     ports:
       - "8005:8005"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_news}
+      # 模块间调用 — 生产环境必须用容器名
       A_URL: http://module-a:8001/run
       B_URL: http://module-b:8002/run-b
       C_URL: http://module-c:8003/push
@@ -97,9 +180,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8005/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ══════════════════════════════════════════════════════════
+  # 模块 F — AI 视频生成 (:8006)
+  # 【仅在本地运行，云端部署需显式启用 --profile video】
+  # ══════════════════════════════════════════════════════════
   module-f:
     build: ./module-f
+    restart: unless-stopped
+    profiles:
+      - video
     ports:
       - "8006:8006"
     environment:
@@ -120,20 +221,37 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ══════════════════════════════════════════════════════════
+  # Nginx — 反向代理 + (可选) SSL 终端
+  # ══════════════════════════════════════════════════════════
   nginx:
     image: nginx:alpine
+    restart: unless-stopped
     ports:
       - "${NGINX_PORT:-80}:80"
+      # SSL 启用后取消下行注释:
+      # - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # SSL 证书挂载（启用后取消注释）:
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - module-a
       - module-b
       - module-c
       - module-d
       - module-e
-      - module-f
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   pgdata:

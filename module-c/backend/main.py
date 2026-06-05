@@ -4,8 +4,10 @@ Phase 2 更新：新增公众号回调、标签管理、用户行为追踪、个
 Phase 3 更新：新增 Agent 自主扩展信源 API（信源健康度 / 推荐列表 / 审核）。
 无 PostgreSQL 时自动使用内置假数据，无需任何外部依赖即可运行。
 """
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
 import json
-import os
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response

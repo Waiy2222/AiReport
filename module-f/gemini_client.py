@@ -241,13 +241,14 @@ def _extract_frames(video_path: str, count: int = 5) -> list[str]:
     cmd = [
         "ffmpeg", "-y",
         "-i", video_path,
-        "-vf", f"fps={fps},scale='min({FRAME_MAX_SIZE},iw)':min'({FRAME_MAX_SIZE},ih)':force_original_aspect_ratio=decrease",
+        "-vf", f"fps={fps},scale='min({FRAME_MAX_SIZE},iw)':'min({FRAME_MAX_SIZE},ih)':force_original_aspect_ratio=decrease",
         "-q:v", "3",
         "-frames:v", str(count),
         out_pattern,
     ]
     try:
-        subprocess.run(cmd, capture_output=True, timeout=60, check=True)
+        subprocess.run(cmd, capture_output=True, timeout=60, check=True,
+                       encoding="utf-8", errors="replace")
     except Exception:
         logger.warning("ffmpeg frame extraction failed for %s", video_path)
         return []
@@ -270,7 +271,8 @@ def _get_duration(video_path: str) -> float:
         "-of", "default=noprint_wrappers=1:nokey=1",
         video_path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=15,
+                            encoding="utf-8", errors="replace")
     return float(result.stdout.strip())
 
 

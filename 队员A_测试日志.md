@@ -1099,7 +1099,7 @@ curl -s http://localhost/health/a
 
 | Phase | 检测点数 | 通过 | 失败 | 跳过 | 状态 |
 |-------|---------|------|------|------|------|
-| Phase 0: 环境搭建 | 5 | — | — | 5 | ⏭️ 需 Docker/PostgreSQL |
+| Phase 0: 环境搭建 | 5 | 5 | 0 | 0 | ✅ PostgreSQL 16 已安装 + schema/seed 执行成功 |
 | Phase 1: __init__.py | 1 | 1 | 0 | 0 | ✅ pytest 验证 |
 | Phase 1.5: filters.py | 2 | 2 | 0 | 0 | ✅ pytest 8 项通过 |
 | Phase 2: github.py | 5 | 5 | 0 | 0 | ✅ pytest 6 项通过 |

@@ -41,10 +41,14 @@
 
 ## [2026-06-02 21:40] 测试2: trend_agent.py — 集成测试（真实 DB）
 
-- **测试方案**：连真实 PostgreSQL 调用 `analyze_trends(pool)`
-- **测试数据**：数据库中真实简报数据
-- **测试结果**：⏭️ 跳过
-- **原因分析**：本地 PostgreSQL 未运行（WinError 1225），无法进行 DB 集成测试。mock 回退路径已在测试1 中验证通过，生产环境部署时需补充此测试。
+- **测试方案**：连真实 PostgreSQL 调用 `analyze_trends(pool)`，验证 DB 连接 + 查询 + 容错
+- **测试数据**：PostgreSQL 16 本地运行，ai_news 数据库（seed 数据 2026-05-24）
+- **测试结果**：✅ 通过
+- **原因分析**：
+  - `_fetch_briefing_history(pool, 7)` → 正确连接 DB 并查询，返回 0 条（seed 数据超过 7 天窗口）
+  - `analyze_trends(pool, 7)` → 检测到无数据后自动回退 mock，返回完整结构
+  - 所有字段 period/rising/falling/new_tags/agent_insight/generated_at 全部存在
+  - 验证了 DB 连接正常、SQL 查询不报错、空结果时容错逻辑正确
 
 ---
 
@@ -164,7 +168,7 @@
 |---|---|---|
 | 环境检查 | ✅ 部分通过 | 依赖 OK，PostgreSQL 未运行 |
 | 测试1: mock 单元 | ✅ 通过 | tag 频次统计正确，anomalies 分类正确 |
-| 测试2: DB 集成 | ⏭️ 跳过 | 本地无 PostgreSQL，需生产环境补充 |
+| 测试2: DB 集成 | ✅ 通过 | seed 数据超 7 天窗口→自动回退 mock，DB 连接+查询正常 |
 | 测试3: API 响应 | ✅ 通过 | 3 个端点全部 200/404 正确，修复了 import 路径问题 |
 | 测试4: 路由注册 | ✅ 通过 | 三端点均 200，无 import 错误 |
 | 测试5: api.js | ✅ 代码审查 | 2 个方法正确添加 |

@@ -1111,4 +1111,8 @@ curl -s http://localhost/health/a
 | Phase 8: Docker | 2 | — | — | 2 | ⏭️ 需 Docker 环境 |
 | **合计** | **32** | **25** | **0** | **7** | **✅** |
 
-> 补测说明（2026-06-05）：通过 `pytest test_filters.py test_github.py test_hackernews.py test_rss.py test_reddit.py test_orchestrator.py test_llm_filter.py test_source_agent.py -v` 运行 66 项自动化测试，全部通过。Phase 0（Docker/PG 环境搭建）和 Phase 8（Docker 集成）需真实环境，标记为跳过。
+> 补测说明（2026-06-07）：
+> - pytest 66 项自动化测试全部通过
+> - PostgreSQL 16 已安装运行，schema + seed 执行成功，Phase 0 全部完成
+> - module-a:8001 / module-b:8002 / module-c:8003 / module-d:8004 四模块全部在线 DB=connected
+> - Phase 8 Docker 集成仍需 Docker Desktop（本地未安装），但各模块已通过 Python 直接运行验证

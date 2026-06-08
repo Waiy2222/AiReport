@@ -1108,11 +1108,13 @@ curl -s http://localhost/health/a
 | Phase 5: reddit.py | 2 | 2 | 0 | 0 | ✅ pytest 4 项通过 |
 | Phase 6: orchestrator.py | 6 | 6 | 0 | 0 | ✅ pytest 10 项通过 |
 | Phase 7: main.py 集成 | 2 | 2 | 0 | 0 | ✅ pytest 集成测试通过 |
-| Phase 8: Docker | 2 | — | — | 2 | ⏭️ 需 Docker 环境 |
-| **合计** | **32** | **25** | **0** | **7** | **✅** |
+| Phase 8: Docker | 2 | 2 | 0 | 0 | ✅ docker compose up -d 7容器全部运行 + nginx 路由验证通过 |
+| **合计** | **32** | **32** | **0** | **0** | **✅ 全部通过** |
 
-> 补测说明（2026-06-07）：
+> 补测说明（2026-06-08）：
 > - pytest 66 项自动化测试全部通过
 > - PostgreSQL 16 已安装运行，schema + seed 执行成功，Phase 0 全部完成
-> - module-a:8001 / module-b:8002 / module-c:8003 / module-d:8004 四模块全部在线 DB=connected
-> - Phase 8 Docker 集成仍需 Docker Desktop（本地未安装），但各模块已通过 Python 直接运行验证
+> - Docker Desktop 已安装，docker compose up -d 启动 7 个容器（postgres + 5模块 + nginx）
+> - nginx 网关路由验证：/health/a, /health/b, /health/c 全部 200
+> - 网络修复：pip 镜像源改为阿里云，apt 镜像源改为阿里云，Docker DNS 配置国内 DNS
+> - 32 项测试全部通过，0 失败，0 跳过

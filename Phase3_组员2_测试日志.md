@@ -95,5 +95,6 @@
 | 测试5: API 函数 | ✅ 通过 | approve/recommendations/health 函数均存在 |
 | 测试6: Module C | ✅ 通过 | 68 项全部通过 |
 | 测试7: 全项目 | ✅ 通过 | 57 项全部通过 |
+| 测试8: Docker 部署 | ✅ 通过 | 7 容器全部运行 + nginx 路由验证 |
 
-**最终结论**：11 项测试全部通过。已修复 check_coverage 等 4 个函数的 None pool 处理。PostgreSQL 16 已部署，schema_v3 执行成功，数据库 9 张表全部就绪。
+**最终结论**：12 项测试全部通过。已修复 check_coverage 等 4 个函数的 None pool 处理。PostgreSQL 16 已部署，schema_v3 执行成功，数据库 9 张表全部就绪。Docker 部署验证完成，7 容器全部在线运行。

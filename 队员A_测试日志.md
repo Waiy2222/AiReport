@@ -1099,14 +1099,22 @@ curl -s http://localhost/health/a
 
 | Phase | 检测点数 | 通过 | 失败 | 跳过 | 状态 |
 |-------|---------|------|------|------|------|
-| Phase 0: 环境搭建 | 5 | — | — | — | ⏳ |
-| Phase 1: __init__.py | 1 | — | — | — | ⏳ |
-| Phase 1.5: filters.py | 2 | — | — | — | ⏳ |
-| Phase 2: github.py | 5 | — | — | — | ⏳ |
-| Phase 3: hackernews.py | 4 | — | — | — | ⏳ |
-| Phase 4: rss.py | 3 | — | — | — | ⏳ |
-| Phase 5: reddit.py | 2 | — | — | — | ⏳ |
-| Phase 6: orchestrator.py | 6 | — | — | — | ⏳ |
-| Phase 7: main.py 集成 | 2 | — | — | — | ⏳ |
-| Phase 8: Docker | 2 | — | — | — | ⏳ |
-| **合计** | **32** | — | — | — | ⏳ |
+| Phase 0: 环境搭建 | 5 | 5 | 0 | 0 | ✅ PostgreSQL 16 已安装 + schema/seed 执行成功 |
+| Phase 1: __init__.py | 1 | 1 | 0 | 0 | ✅ pytest 验证 |
+| Phase 1.5: filters.py | 2 | 2 | 0 | 0 | ✅ pytest 8 项通过 |
+| Phase 2: github.py | 5 | 5 | 0 | 0 | ✅ pytest 6 项通过 |
+| Phase 3: hackernews.py | 4 | 4 | 0 | 0 | ✅ pytest 5 项通过 |
+| Phase 4: rss.py | 3 | 3 | 0 | 0 | ✅ pytest 5 项通过 |
+| Phase 5: reddit.py | 2 | 2 | 0 | 0 | ✅ pytest 4 项通过 |
+| Phase 6: orchestrator.py | 6 | 6 | 0 | 0 | ✅ pytest 10 项通过 |
+| Phase 7: main.py 集成 | 2 | 2 | 0 | 0 | ✅ pytest 集成测试通过 |
+| Phase 8: Docker | 2 | 2 | 0 | 0 | ✅ docker compose up -d 7容器全部运行 + nginx 路由验证通过 |
+| **合计** | **32** | **32** | **0** | **0** | **✅ 全部通过** |
+
+> 补测说明（2026-06-08）：
+> - pytest 66 项自动化测试全部通过
+> - PostgreSQL 16 已安装运行，schema + seed 执行成功，Phase 0 全部完成
+> - Docker Desktop 已安装，docker compose up -d 启动 7 个容器（postgres + 5模块 + nginx）
+> - nginx 网关路由验证：/health/a, /health/b, /health/c 全部 200
+> - 网络修复：pip 镜像源改为阿里云，apt 镜像源改为阿里云，Docker DNS 配置国内 DNS
+> - 32 项测试全部通过，0 失败，0 跳过

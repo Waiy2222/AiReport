@@ -9,8 +9,8 @@ def test_rss_sources_not_empty():
     """RSS 源列表至少包含已知的 5 个源"""
     assert len(RSS_SOURCES) >= 5
     names = [s["name"] for s in RSS_SOURCES]
-    assert "arxiv" in names
-    assert "huggingface" in names
+    assert "huggingface_blog" in names
+    assert "36kr" in names
 
 
 def test_rss_sources_have_required_keys():

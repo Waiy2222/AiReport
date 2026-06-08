@@ -110,8 +110,12 @@ async def check_coverage(pool) -> list[dict]:
     返回 [{tag, label_zh, count, days_under_threshold}]。
 
     参数:
-        pool: asyncpg 连接池
+        pool: asyncpg 连接池。为 None 时返回 mock 数据。
     """
+    if pool is None:
+        logger.warning("[source_agent] pool=None, returning mock coverage data")
+        return _mock_check_coverage()
+
     cutoff = date.today() - timedelta(days=COVERAGE_DAYS)
     logger.info(f"[source_agent] 检查覆盖率，cutoff={cutoff}, threshold={COVERAGE_THRESHOLD}")
 
@@ -172,6 +176,26 @@ async def check_coverage(pool) -> list[dict]:
         f"[source_agent] 覆盖检查完成: 总标签={len(tags)}, 不足={len(under_tags)}"
     )
     return under_tags
+
+
+def _mock_check_coverage() -> list[dict]:
+    """无 DB 时返回 mock 覆盖率数据"""
+    return [
+        {
+            "tag": "RAG",
+            "label_zh": "RAG",
+            "count": 1,
+            "days_under_threshold": 3,
+            "threshold": COVERAGE_THRESHOLD,
+        },
+        {
+            "tag": "AI安全",
+            "label_zh": "AI安全",
+            "count": 0,
+            "days_under_threshold": 3,
+            "threshold": COVERAGE_THRESHOLD,
+        },
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -606,6 +630,10 @@ async def get_sources_health(pool) -> list[dict]:
     返回: [{tag, label_zh, count, health, recommendations_pending}]
         health: "green" (>=5), "yellow" (2-4), "red" (<2)
     """
+    if pool is None:
+        logger.warning("[source_agent] pool=None, returning mock health data")
+        return _mock_sources_health()
+
     cutoff = date.today() - timedelta(days=COVERAGE_DAYS)
 
     tags = await pool.fetch("SELECT tag, label_zh FROM tag_catalog ORDER BY sort_order")
@@ -652,15 +680,37 @@ async def get_sources_health(pool) -> list[dict]:
     return result
 
 
+def _mock_sources_health() -> list[dict]:
+    """无 DB 时返回 mock 健康度数据"""
+    return [
+        {"tag": "LLM", "label_zh": "大模型", "count": 8, "health": "green",
+         "coverage_threshold": COVERAGE_THRESHOLD, "coverage_days": COVERAGE_DAYS,
+         "recommendations_pending": 0},
+        {"tag": "Agent", "label_zh": "智能体", "count": 6, "health": "green",
+         "coverage_threshold": COVERAGE_THRESHOLD, "coverage_days": COVERAGE_DAYS,
+         "recommendations_pending": 1},
+        {"tag": "RAG", "label_zh": "RAG", "count": 1, "health": "red",
+         "coverage_threshold": COVERAGE_THRESHOLD, "coverage_days": COVERAGE_DAYS,
+         "recommendations_pending": 2},
+        {"tag": "开源", "label_zh": "开源", "count": 4, "health": "yellow",
+         "coverage_threshold": COVERAGE_THRESHOLD, "coverage_days": COVERAGE_DAYS,
+         "recommendations_pending": 0},
+    ]
+
+
 async def get_recommendations(pool, status: str = "pending") -> list[dict]:
     """获取推荐信源列表。
 
     参数:
-        pool: asyncpg 连接池
+        pool: asyncpg 连接池。为 None 时返回 mock 数据。
         status: 筛选状态 (pending/approved/rejected)，默认 pending
 
     返回: [{id, tag, name, url, rss_url, quality_score, ...}]
     """
+    if pool is None:
+        logger.warning("[source_agent] pool=None, returning mock recommendations")
+        return _mock_recommendations(status)
+
     rows = await pool.fetch(
         """SELECT r.*, tc.label_zh AS tag_label
            FROM recommended_sources r
@@ -673,8 +723,50 @@ async def get_recommendations(pool, status: str = "pending") -> list[dict]:
     return [_row_to_dict(r) for r in rows]
 
 
+def _mock_recommendations(status: str = "pending") -> list[dict]:
+    """无 DB 时返回 mock 推荐数据"""
+    if status != "pending":
+        return []
+    return [
+        {
+            "id": "mock-001",
+            "tag": "RAG",
+            "tag_label": "RAG",
+            "name": "LlamaIndex Blog",
+            "url": "https://blog.llamaindex.ai",
+            "rss_url": "https://blog.llamaindex.ai/feed",
+            "quality_score": 4.0,
+            "relevance_score": 5,
+            "freshness_score": 4,
+            "authority_score": 4,
+            "status": "pending",
+            "discovered_at": date.today().isoformat(),
+            "approved_at": None,
+        },
+        {
+            "id": "mock-002",
+            "tag": "RAG",
+            "tag_label": "RAG",
+            "name": "LangChain Blog",
+            "url": "https://blog.langchain.dev",
+            "rss_url": "https://blog.langchain.dev/rss/",
+            "quality_score": 3.7,
+            "relevance_score": 4,
+            "freshness_score": 4,
+            "authority_score": 3,
+            "status": "pending",
+            "discovered_at": date.today().isoformat(),
+            "approved_at": None,
+        },
+    ]
+
+
 async def approve_source(pool, source_id: str) -> dict | None:
-    """通过推荐信源（将 status 改为 approved）"""
+    """通过推荐信源（将 status 改为 approved）。pool 为 None 时返回 None。"""
+    if pool is None:
+        logger.warning("[source_agent] pool=None, approve_source not available")
+        return None
+
     from uuid import UUID
 
     try:

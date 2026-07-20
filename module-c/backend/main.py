@@ -188,11 +188,12 @@ async def get_history(
         if date_to:
             conditions.append(f"date <= {next_param(date_to)}::date")
         if tag:
-            # 在 sections[*].items[*].tags 中搜索标签（而非 section 级 tag=section_title）
+            # 在 sections[*].items[*].tags 中搜索标签
+            # 用 @> (contains) 替代 ? 运算符，兼容性更好
             conditions.append(
                 f"EXISTS (SELECT 1 FROM jsonb_array_elements(sections) AS s,"
                 f" jsonb_array_elements(s->'items') AS item"
-                f" WHERE item->'tags' ? {next_param(tag)})"
+                f" WHERE item->'tags' @> jsonb_build_array({next_param(tag)}::text))"
             )
 
         where_clause = ""

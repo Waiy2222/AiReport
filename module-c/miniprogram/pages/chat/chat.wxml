@@ -1,7 +1,10 @@
 <view class="chat-container">
   <!-- 顶部标题栏 -->
   <view class="chat-header">
-    <text class="chat-title">AI 新闻问答</text>
+    <view class="chat-header-top">
+      <text class="chat-title">AI 新闻问答</text>
+      <view class="chat-home-btn" bindtap="onGoHome">首页</view>
+    </view>
     <text class="chat-subtitle">基于实时新闻数据回答</text>
   </view>
 

@@ -24,19 +24,51 @@ REJECT_MESSAGE = "抱歉，我是新闻助手，只能回答新闻相关的问�
 # 检索最低条数阈值（不足时触发实时抓取）
 MIN_RESULTS = 3
 
-CHAT_SYSTEM_PROMPT = """你是一个专业的AI新闻助手，运行在微信小程序中。你的职责是根据已有的新闻数据回答用户的问题。
+CHAT_SYSTEM_PROMPT = """你是一个专业的AI新闻助手，运行在微信小程序中。你的职责是帮助用户了解最新的新闻动态。
 
 ## 核心规则
-1. 只回答与新闻相关的问题。如果用户的问题与新闻无关（闲聊、技术咨询、编程问题、个人建议等），礼貌回复："抱歉，我是新闻助手，只能回答新闻相关的问题哦～"
-2. 回答必须基于下方提供的新闻素材，不要编造不存在的信息。
-3. 每条回答必须注明信息来源（新闻标题）。
-4. 如果新闻素材中没有相关内容，诚实告知："我目前没有找到与您问题相关的新闻，请换个话题试试～"
+1. **打招呼和闲聊**：用户打招呼（如"你好""早上好"）或简单闲聊时，友好自然地回应，并主动引导到新闻话题。例如："早上好！今天AI圈有不少新鲜事，你想了解哪方面的新闻？"
+2. **新闻问题**：基于下方提供的新闻素材回答，不要编造不存在的信息。每条回答注明信息来源。
+3. **无关话题**：遇到与新闻完全无关且不符合社会主义核心价值观的内容（技术咨询、编程、个人建议等），礼貌引导回新闻："这个话题我不太擅长，不如聊聊新闻？今天有哪些你关注的领域？"
+4. **敏感内容**：遇到违法违规、暴力、色情等不符合社会主义核心价值观的内容，坚定拒绝："抱歉，我不能回答这类问题。有什么新闻相关的话题我可以帮你？"
 5. 回答简洁有力，200字以内。
 6. 使用中文回答。
+7. 回答风格亲切、有人情味。
 
 ## 当前时间
 {current_time}
 """
+
+
+async def _classify_query(query: str) -> str:
+    """将用户问题分为三类: NEWS / CHAT / OFF_TOPIC"""
+    client = get_client()
+    prompt = f"""分析以下用户输入，判断属于哪一类。只回复一个单词：NEWS, CHAT, 或 OFF_TOPIC。
+
+- NEWS: 询问新闻事件、行业动态、科技进展、公司动向等
+- CHAT: 打招呼、寒暄、简单闲聊（如"你好""早上好""谢谢""再见"）
+- OFF_TOPIC: 与新闻完全无关的内容（技术咨询、编程帮助、个人建议、违规内容等）
+
+用户输入: {query}
+
+分类:"""
+
+    try:
+        resp = await client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=10,
+        )
+        result = resp.choices[0].message.content.strip().upper()
+        if "CHAT" in result:
+            return "CHAT"
+        elif "OFF" in result:
+            return "OFF_TOPIC"
+        else:
+            return "NEWS"
+    except Exception:
+        return "NEWS"  # API 失败默认当新闻处理
 
 
 async def extract_keywords(query: str) -> list[str]:
@@ -189,16 +221,23 @@ async def chat(query: str, history: list[dict], db_pool=None) -> dict:
     Returns:
         {"reply": "AI 回复", "sources": [{"title":"...","url":"...","source":"..."}]}
     """
-    # ① 非新闻检测
-    is_news = await _check_news_relevance(query)
-    if not is_news:
-        return {"reply": REJECT_MESSAGE, "sources": []}
+    # ① 分类用户意图
+    category = await _classify_query(query)
+    logger.info("Chat category for '%s': %s", query[:50], category)
 
-    # ② 提取关键词
+    # ② 打招呼/闲聊 → 不用检索新闻，直接用 LLM 友好回应 + 引导新闻话题
+    if category == "CHAT":
+        return await _handle_chat(query, history)
+
+    # ③ 完全无关 → 礼貌引导回新闻
+    if category == "OFF_TOPIC":
+        return await _handle_off_topic(query, history)
+
+    # ④ 新闻类 → 提取关键词 + 检索 + 生成
     keywords = await extract_keywords(query)
     logger.info("Chat keywords for '%s': %s", query[:50], keywords)
 
-    # ③ 检索简报库
+    # ⑤ 检索简报库
     sources = []
     if db_pool:
         try:
@@ -206,7 +245,7 @@ async def chat(query: str, history: list[dict], db_pool=None) -> dict:
         except Exception as e:
             logger.warning("DB search failed: %s", e)
 
-    # ④ 结果不足 → 实时抓取
+    # ⑥ 结果不足 → 实时抓取
     if len(sources) < MIN_RESULTS:
         logger.info("Only %d results from DB, fetching live...", len(sources))
         live_sources = await _fetch_live(keywords)
@@ -216,23 +255,23 @@ async def chat(query: str, history: list[dict], db_pool=None) -> dict:
                 sources.append(ls)
                 seen_urls.add(ls.get("url"))
 
-    # ⑤ 无结果时直接返回
+    # ⑦ 无结果时直接返回
     if not sources:
         return {
             "reply": "我目前没有找到与您问题相关的新闻，请换个话题试试～",
             "sources": [],
         }
 
-    # ⑥ 组装上下文
+    # ⑧ 组装上下文
     sources_text = "\n\n".join(
         f"[{i+1}] {s['title']}\n   来源: {s.get('source', '未知')}\n   日期: {s.get('date', '未知')}\n   摘要: {s.get('content', '')[:150]}"
         for i, s in enumerate(sources[:15])
     )
 
-    # ⑦ 截断历史
+    # ⑨ 截断历史
     recent_history = history[-MAX_HISTORY:] if len(history) > MAX_HISTORY else history
 
-    # ⑧ 构建 messages
+    # ⑩ 构建 messages
     messages = [
         {
             "role": "system",
@@ -241,10 +280,8 @@ async def chat(query: str, history: list[dict], db_pool=None) -> dict:
             ),
         },
     ]
-    # 注入历史
     for h in recent_history:
         messages.append({"role": h["role"], "content": h["content"]})
-    # 注入新闻素材 + 用户问题
     messages.append({
         "role": "user",
         "content": f"""## 相关新闻素材
@@ -256,7 +293,7 @@ async def chat(query: str, history: list[dict], db_pool=None) -> dict:
 请基于上述新闻素材回答用户问题，并引用具体新闻来源。""",
     })
 
-    # ⑨ 调用 DeepSeek 生成回答
+    # ⑪ 调用 DeepSeek 生成回答
     client = get_client()
     try:
         resp = await client.chat.completions.create(
@@ -270,7 +307,6 @@ async def chat(query: str, history: list[dict], db_pool=None) -> dict:
         logger.error("Chat generation failed: %s", e)
         reply = "抱歉，AI 服务暂时不可用，请稍后再试。"
 
-    # ⑩ 构建返回
     return {
         "reply": reply,
         "sources": [
@@ -278,3 +314,82 @@ async def chat(query: str, history: list[dict], db_pool=None) -> dict:
             for s in sources[:10]
         ],
     }
+
+
+async def _handle_chat(query: str, history: list[dict]) -> dict:
+    """处理打招呼和闲聊：友好回应 + 引导新闻话题"""
+    client = get_client()
+    recent_history = history[-MAX_HISTORY:] if len(history) > MAX_HISTORY else history
+
+    messages = [
+        {
+            "role": "system",
+            "content": f"""你是一个专业的AI新闻助手。用户正在跟你打招呼或闲聊。
+
+## 规则
+1. 友好自然地回应问候（如"你好""早上好""谢谢"等）。
+2. 回应简洁，1-2句话即可。
+3. 回应后主动引导到新闻话题，例如推荐今日热点或询问用户感兴趣的领域。
+4. 保持亲切、有人情味的语气。
+5. 内容必须符合社会主义核心价值观。
+
+## 当前时间
+{datetime.now().strftime("%Y-%m-%d %H:%M")}""",
+        },
+    ]
+    for h in recent_history:
+        messages.append({"role": h["role"], "content": h["content"]})
+    messages.append({"role": "user", "content": query})
+
+    try:
+        resp = await client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=messages,
+            temperature=0.8,
+            max_tokens=200,
+        )
+        reply = resp.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error("Chat greeting failed: %s", e)
+        reply = "你好！我是AI新闻助手，今天有什么新闻话题想了解的吗？"
+
+    return {"reply": reply, "sources": []}
+
+
+async def _handle_off_topic(query: str, history: list[dict]) -> dict:
+    """处理无关话题：礼貌引导回新闻"""
+    client = get_client()
+    recent_history = history[-MAX_HISTORY:] if len(history) > MAX_HISTORY else history
+
+    messages = [
+        {
+            "role": "system",
+            "content": f"""你是一个专业的AI新闻助手。用户发来了一条与新闻无关的消息。
+
+## 规则
+1. 礼貌表示这个话题你不太擅长。
+2. 自然地引导用户回到新闻话题，可以推荐几个方向（AI动态、科技资讯、行业趋势等）。
+3. 回复简洁，1-2句话。
+4. 内容必须符合社会主义核心价值观。如果是违法违规内容，坚定拒绝。
+
+## 当前时间
+{datetime.now().strftime("%Y-%m-%d %H:%M")}""",
+        },
+    ]
+    for h in recent_history:
+        messages.append({"role": h["role"], "content": h["content"]})
+    messages.append({"role": "user", "content": query})
+
+    try:
+        resp = await client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=200,
+        )
+        reply = resp.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error("Chat off-topic handling failed: %s", e)
+        reply = "这个话题我不太擅长，不如聊聊新闻？今天有哪些你关注的领域？"
+
+    return {"reply": reply, "sources": []}

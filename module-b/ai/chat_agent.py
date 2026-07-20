@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # 确保 module-b/ai 在 sys.path 中（兼容 importlib 导入和直接运行）
 _cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -165,7 +165,7 @@ async def _fetch_live(keywords: list[str]) -> list[dict]:
         spec.loader.exec_module(rss_module)
 
         # 使用 RSS scraper 的 fetch_rss 函数，抓取最近 24 小时的新闻
-        since = datetime.now() - timedelta(hours=24)
+        since = datetime.now(timezone.utc) - timedelta(hours=24)
         items = await rss_module.fetch_rss(since, None)
 
         # 按关键词过滤

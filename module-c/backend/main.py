@@ -207,7 +207,7 @@ async def get_history(
                          {where_clause}
                          ORDER BY date DESC"""
             all_rows = await pool.fetch(query, *params)
-            logger.info(f"[history] tag filter: tag={tag}, before_filter={len(all_rows)}")
+            print(f"[history] tag filter: tag={tag}, before_filter={len(all_rows)}")
 
             # 诊断：打印前2条简报的 item tags 样本
             for idx, r in enumerate(all_rows[:2]):
@@ -218,7 +218,7 @@ async def get_history(
                 for s in (sections or [])[:2]:
                     for item in (s.get("items") or [])[:1]:
                         sample_tags.append(item.get("tags", []))
-                logger.info(f"[history] sample[{idx}]: date={r['date']}, item_tags={sample_tags}")
+                print(f"[history] sample[{idx}]: date={r['date']}, item_tags={sample_tags}")
 
             def _has_item_tag(row):
                 sections = row["sections"]
@@ -234,7 +234,7 @@ async def get_history(
             total = len(filtered)
             offset = (page - 1) * size
             rows = filtered[offset:offset + size]
-            logger.info(f"[history] tag filter: after_filter={total}, page_rows={len(rows)}")
+            print(f"[history] tag filter: after_filter={total}, page_rows={len(rows)}")
 
         items = [
             {

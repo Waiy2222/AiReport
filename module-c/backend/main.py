@@ -166,9 +166,8 @@ async def get_history(
 ):
     try:
         pool = _db()
-        offset = (page - 1) * size
 
-        # 动态构建 WHERE 条件
+        # 动态构建 WHERE 条件（tag 在 Python 侧过滤，避免 JSONB 兼容问题）
         conditions: list[str] = []
         params: list = []
         param_idx = 0
@@ -187,28 +186,55 @@ async def get_history(
             conditions.append(f"date >= {next_param(date_from)}::date")
         if date_to:
             conditions.append(f"date <= {next_param(date_to)}::date")
-        if tag:
-            # 在 sections[*].items[*].tags 中搜索标签
-            # 用 @> (contains) 替代 ? 运算符，兼容性更好
-            conditions.append(
-                f"EXISTS (SELECT 1 FROM jsonb_array_elements(sections) AS s,"
-                f" jsonb_array_elements(s->'items') AS item"
-                f" WHERE item->'tags' @> jsonb_build_array({next_param(tag)}::text))"
-            )
 
         where_clause = ""
         if conditions:
             where_clause = "WHERE " + " AND ".join(conditions)
 
-        query = f"""SELECT id, type, date, tl_dr, sections, generated_at FROM briefings
-                     {where_clause}
-                     ORDER BY date DESC OFFSET {next_param(offset)} LIMIT {next_param(size)}"""
-        rows = await pool.fetch(query, *params)
+        # 无 tag 筛选：直接分页查询
+        if not tag:
+            offset = (page - 1) * size
+            query = f"""SELECT id, type, date, tl_dr, sections, generated_at FROM briefings
+                         {where_clause}
+                         ORDER BY date DESC OFFSET {next_param(offset)} LIMIT {next_param(size)}"""
+            rows = await pool.fetch(query, *params)
+            count_params = params[:-2] if (len(params) >= 2) else params
+            count_query = f"SELECT COUNT(*) FROM briefings {where_clause}"
+            total = await pool.fetchval(count_query, *count_params)
+        else:
+            # tag 筛选：全量查出再 Python 侧过滤（避免 JSONB 运算符 asyncpg 兼容问题）
+            query = f"""SELECT id, type, date, tl_dr, sections, generated_at FROM briefings
+                         {where_clause}
+                         ORDER BY date DESC"""
+            all_rows = await pool.fetch(query, *params)
+            logger.info(f"[history] tag filter: tag={tag}, before_filter={len(all_rows)}")
 
-        # COUNT query (reuse conditions, different params for offset/limit)
-        count_params = params[:-2] if (len(params) >= 2) else params
-        count_query = f"SELECT COUNT(*) FROM briefings {where_clause}"
-        total = await pool.fetchval(count_query, *count_params)
+            # 诊断：打印前2条简报的 item tags 样本
+            for idx, r in enumerate(all_rows[:2]):
+                sections = r["sections"]
+                if isinstance(sections, str):
+                    sections = json.loads(sections)
+                sample_tags = []
+                for s in (sections or [])[:2]:
+                    for item in (s.get("items") or [])[:1]:
+                        sample_tags.append(item.get("tags", []))
+                logger.info(f"[history] sample[{idx}]: date={r['date']}, item_tags={sample_tags}")
+
+            def _has_item_tag(row):
+                sections = row["sections"]
+                if isinstance(sections, str):
+                    sections = json.loads(sections)
+                for s in (sections or []):
+                    for item in (s.get("items") or []):
+                        if tag in (item.get("tags") or []):
+                            return True
+                return False
+
+            filtered = [r for r in all_rows if _has_item_tag(r)]
+            total = len(filtered)
+            offset = (page - 1) * size
+            rows = filtered[offset:offset + size]
+            logger.info(f"[history] tag filter: after_filter={total}, page_rows={len(rows)}")
 
         items = [
             {

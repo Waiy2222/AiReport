@@ -7,6 +7,10 @@ Phase 3 更新：新增 Agent 自主扩展信源 API（信源健康度 / 推荐�
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
+# 加载 .env（与其他模块一致）
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+
 import json
 from uuid import UUID
 
@@ -184,8 +188,12 @@ async def get_history(
         if date_to:
             conditions.append(f"date <= {next_param(date_to)}::date")
         if tag:
-            # JSONB contains: sections 数组中任意元素 tag 匹配
-            conditions.append(f"sections @> {next_param(json.dumps([{"tag": tag}]))}::jsonb")
+            # 在 sections[*].items[*].tags 中搜索标签（而非 section 级 tag=section_title）
+            conditions.append(
+                f"EXISTS (SELECT 1 FROM jsonb_array_elements(sections) AS s,"
+                f" jsonb_array_elements(s->'items') AS item"
+                f" WHERE item->'tags' ? {next_param(tag)})"
+            )
 
         where_clause = ""
         if conditions:
@@ -226,10 +234,13 @@ async def get_history(
         if date_to:
             all_briefings = [b for b in all_briefings if b["date"] <= date_to]
         if tag:
-            all_briefings = [
-                b for b in all_briefings
-                if any(s.get("tag") == tag for s in (b.get("sections") or []))
-            ]
+            def _has_item_tag(briefing):
+                for s in (briefing.get("sections") or []):
+                    for item in (s.get("items") or []):
+                        if tag in (item.get("tags") or []):
+                            return True
+                return False
+            all_briefings = [b for b in all_briefings if _has_item_tag(b)]
         total = len(all_briefings)
         start = (page - 1) * size
         end = start + size

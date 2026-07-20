@@ -8,6 +8,30 @@
     </view>
   </view>
 
+  <!-- 筛选栏 -->
+  <view class="filter-bar">
+    <!-- 类型切换 -->
+    <view class="filter-row">
+      <view class="filter-chip {{filterType === '' ? 'active' : ''}}" data-type="" bindtap="onFilterType">全部</view>
+      <view class="filter-chip {{filterType === 'morning' ? 'active' : ''}}" data-type="morning" bindtap="onFilterType">☀️ 早报</view>
+      <view class="filter-chip {{filterType === 'evening' ? 'active' : ''}}" data-type="evening" bindtap="onFilterType">🌙 晚报</view>
+      <view class="filter-divider"></view>
+      <view class="filter-chip {{filterDate === '7d' ? 'active' : ''}}" data-date="7d" bindtap="onFilterDate">最近7天</view>
+      <view class="filter-chip {{filterDate === '30d' ? 'active' : ''}}" data-date="30d" bindtap="onFilterDate">最近30天</view>
+    </view>
+
+    <!-- 标签筛选 -->
+    <view class="tag-row-wrap">
+      <view class="filter-chip tag-chip {{filterTag === '' ? 'active' : ''}}" data-tag="" bindtap="onSelectTag">全部标签</view>
+      <view wx:for="{{tags}}" wx:key="tag" class="filter-chip tag-chip {{filterTag === item.tag ? 'active' : ''}}" data-tag="{{item.tag}}" bindtap="onSelectTag">{{item.label_zh || item.tag}}</view>
+    </view>
+
+    <!-- 清除筛选 -->
+    <view wx:if="{{filterType || filterTag || filterDate}}" class="clear-filters" bindtap="onClearFilters">
+      <text>✕ 清除筛选</text>
+    </view>
+  </view>
+
   <!-- 统计摘要 -->
   <view wx:if="{{!keyword && total > 0}}" class="history-summary">
     <view class="hstat-item">
@@ -43,6 +67,10 @@
           <text>{{p}}</text>
         </view>
       </view>
+      <!-- 标签 -->
+      <view wx:if="{{item.tags.length > 0}}" class="hcard-tags">
+        <view wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this" class="hcard-tag">{{tag}}</view>
+      </view>
       <view class="hcard-bottom">
         <text wx:if="{{item.tl_dr.length > 3}}" class="hcard-more">共 {{item.tl_dr.length}} 条要点</text>
         <text class="hcard-arrow">查看详情 →</text>
@@ -61,9 +89,10 @@
 
   <!-- 空 -->
   <view wx:if="{{!loading && list.length === 0}}">
-    <view wx:if="{{keyword}}" class="empty-state">
+    <view wx:if="{{keyword || filterType || filterTag || filterDate}}" class="empty-state">
       <text class="empty-icon">🔍</text>
-      <text>未找到相关简报</text>
+      <text>未找到匹配的简报</text>
+      <text class="empty-hint" bindtap="onClearFilters">清除筛选条件</text>
     </view>
     <view wx:else class="empty-state">
       <text class="empty-icon">📋</text>

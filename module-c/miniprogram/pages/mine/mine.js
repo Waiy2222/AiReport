@@ -146,6 +146,10 @@ Page({
     }
   },
 
+  onChatEntry() {
+    wx.navigateTo({ url: "/pages/chat/chat" });
+  },
+
   onAbout() {
     wx.showModal({
       title: "AI 资讯简报",

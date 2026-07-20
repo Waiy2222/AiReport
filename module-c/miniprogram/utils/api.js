@@ -30,9 +30,13 @@ module.exports = {
     return request(`/api/briefings/latest?type=${type}`);
   },
 
-  getBriefingHistory(page = 1, size = 20, keyword = "") {
+  getBriefingHistory(page = 1, size = 20, keyword = "", filters = {}) {
     let url = `/api/briefings/history?page=${page}&size=${size}`;
     if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
+    if (filters.type) url += `&type=${encodeURIComponent(filters.type)}`;
+    if (filters.dateFrom) url += `&date_from=${encodeURIComponent(filters.dateFrom)}`;
+    if (filters.dateTo) url += `&date_to=${encodeURIComponent(filters.dateTo)}`;
+    if (filters.tag) url += `&tag=${encodeURIComponent(filters.tag)}`;
     return request(url);
   },
 
@@ -94,4 +98,14 @@ module.exports = {
   getTagTrend(tag) {
     return request(`/api/trends/tag/${encodeURIComponent(tag)}`);
   },
+
+  // Chat 对话接口
+  chatSend(message) {
+    return request("/api/chat/send", "POST", { message });
+  },
+
+  getChatSuggestions() {
+    return request("/api/chat/suggestions");
+  },
+
 };

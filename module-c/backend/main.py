@@ -47,6 +47,10 @@ app.include_router(tags_router)
 from trends import router as trends_router, set_db_pool as set_trends_db_pool
 app.include_router(trends_router)
 
+# 注册 Chat 对话路由
+from chat import router as chat_router, set_db_pool as set_chat_db_pool
+app.include_router(chat_router)
+
 
 @app.on_event("startup")
 async def startup():
@@ -59,6 +63,7 @@ async def startup():
         _db_ok = True
         set_tags_db_pool(pool)
         set_trends_db_pool(pool)
+        set_chat_db_pool(pool)
         print("[module-c] PostgreSQL connected")
     except Exception:
         _db_ok = False
@@ -75,6 +80,18 @@ def _db():
     if not _db_ok:
         raise RuntimeError("db unavailable")
     return get_pool()
+
+
+def _normalize_sections(sections):
+    """兼容旧数据：section_title -> tag + title"""
+    if isinstance(sections, str):
+        sections = json.loads(sections)
+    for s in sections:
+        if "tag" not in s or not s.get("tag"):
+            s["tag"] = s.get("section_title", "综合")
+        if "title" not in s or not s.get("title"):
+            s["title"] = s.get("section_title", "综合")
+    return sections
 
 
 def _get_pool_or_503():
@@ -118,7 +135,7 @@ async def get_latest(type: str = Query(..., description="morning or evening")):
             "date": str(row["date"]),
             "headline": raw_stats.get("headline", {}),
             "tl_dr": row["tl_dr"],
-            "sections": row["sections"],
+            "sections": _normalize_sections(row["sections"]),
             "key_takeaways": row["key_takeaways"],
             "raw_stats": raw_stats,
             "generated_at": row["generated_at"].isoformat(),
@@ -127,6 +144,7 @@ async def get_latest(type: str = Query(..., description="morning or evening")):
         all_briefings = get_briefings()
         for b in all_briefings:
             if b["type"] == type:
+                b["sections"] = _normalize_sections(b.get("sections", []))
                 return b
         raise HTTPException(404, "no briefing found")
 
@@ -137,27 +155,51 @@ async def get_history(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     keyword: str = Query("", description="搜索关键词"),
+    type: str = Query("", description="筛选类型: morning / evening / 空=全部"),
+    date_from: str = Query("", description="起始日期 YYYY-MM-DD"),
+    date_to: str = Query("", description="结束日期 YYYY-MM-DD"),
+    tag: str = Query("", description="标签筛选，如 LLM, Agent"),
 ):
     try:
         pool = _db()
         offset = (page - 1) * size
+
+        # 动态构建 WHERE 条件
+        conditions: list[str] = []
+        params: list = []
+        param_idx = 0
+
+        def next_param(val):
+            nonlocal param_idx
+            param_idx += 1
+            params.append(val)
+            return f"${param_idx}"
+
         if keyword:
-            rows = await pool.fetch(
-                """SELECT id, type, date, tl_dr, generated_at FROM briefings
-                   WHERE tl_dr::text ILIKE $1
-                   ORDER BY date DESC OFFSET $2 LIMIT $3""",
-                f"%{keyword}%", offset, size,
-            )
-            total = await pool.fetchval(
-                "SELECT COUNT(*) FROM briefings WHERE tl_dr::text ILIKE $1",
-                f"%{keyword}%",
-            )
-        else:
-            rows = await pool.fetch(
-                "SELECT id, type, date, tl_dr, generated_at FROM briefings ORDER BY date DESC OFFSET $1 LIMIT $2",
-                offset, size,
-            )
-            total = await pool.fetchval("SELECT COUNT(*) FROM briefings")
+            conditions.append(f"tl_dr::text ILIKE {next_param(f'%{keyword}%')}")
+        if type:
+            conditions.append(f"type = {next_param(type)}")
+        if date_from:
+            conditions.append(f"date >= {next_param(date_from)}::date")
+        if date_to:
+            conditions.append(f"date <= {next_param(date_to)}::date")
+        if tag:
+            # JSONB contains: sections 数组中任意元素 tag 匹配
+            conditions.append(f"sections @> {next_param(json.dumps([{"tag": tag}]))}::jsonb")
+
+        where_clause = ""
+        if conditions:
+            where_clause = "WHERE " + " AND ".join(conditions)
+
+        query = f"""SELECT id, type, date, tl_dr, sections, generated_at FROM briefings
+                     {where_clause}
+                     ORDER BY date DESC OFFSET {next_param(offset)} LIMIT {next_param(size)}"""
+        rows = await pool.fetch(query, *params)
+
+        # COUNT query (reuse conditions, different params for offset/limit)
+        count_params = params[:-2] if (len(params) >= 2) else params
+        count_query = f"SELECT COUNT(*) FROM briefings {where_clause}"
+        total = await pool.fetchval(count_query, *count_params)
 
         items = [
             {
@@ -165,6 +207,7 @@ async def get_history(
                 "type": r["type"],
                 "date": str(r["date"]),
                 "tl_dr": r["tl_dr"],
+                "sections": _normalize_sections(r["sections"]),
                 "generated_at": r["generated_at"].isoformat(),
             }
             for r in rows
@@ -176,6 +219,17 @@ async def get_history(
                 b for b in all_briefings
                 if keyword.lower() in str(b["tl_dr"]).lower()
             ]
+        if type:
+            all_briefings = [b for b in all_briefings if b["type"] == type]
+        if date_from:
+            all_briefings = [b for b in all_briefings if b["date"] >= date_from]
+        if date_to:
+            all_briefings = [b for b in all_briefings if b["date"] <= date_to]
+        if tag:
+            all_briefings = [
+                b for b in all_briefings
+                if any(s.get("tag") == tag for s in (b.get("sections") or []))
+            ]
         total = len(all_briefings)
         start = (page - 1) * size
         end = start + size
@@ -185,6 +239,7 @@ async def get_history(
                 "type": b["type"],
                 "date": b["date"],
                 "tl_dr": b["tl_dr"],
+                "sections": _normalize_sections(b.get("sections", [])),
                 "generated_at": b["generated_at"],
             }
             for b in all_briefings[start:end]
@@ -214,7 +269,7 @@ async def get_briefing_detail(briefing_id: str):
             "date": str(row["date"]),
             "language": row["language"],
             "tl_dr": row["tl_dr"],
-            "sections": row["sections"],
+            "sections": _normalize_sections(row["sections"]),
             "key_takeaways": row["key_takeaways"],
             "raw_stats": row["raw_stats"],
             "generated_at": row["generated_at"].isoformat(),
@@ -222,6 +277,7 @@ async def get_briefing_detail(briefing_id: str):
     except RuntimeError:
         for b in get_briefings():
             if b["id"] == briefing_id:
+                b["sections"] = _normalize_sections(b.get("sections", []))
                 return b
         raise HTTPException(404, "briefing not found")
 

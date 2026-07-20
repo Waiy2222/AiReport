@@ -1,61 +1,145 @@
+/* ══════════════════════════════════════════
+   我的页面 — 个人中心 v2.0
+   ══════════════════════════════════════════ */
+
+page {
+  background: var(--bg-page);
+}
+
+.container {
+  padding: 20rpx 24rpx 60rpx;
+  min-height: 100vh;
+}
+
+/* ══════════════════════════════════════════
+   用户信息卡片
+   ══════════════════════════════════════════ */
 .user-card {
   display: flex;
   align-items: center;
-  background: linear-gradient(135deg, #4a90d9, #5c6bc0);
-  border-radius: 14px;
-  padding: 24px 20px;
-  margin-bottom: 20px;
+  background: linear-gradient(145deg, #1e3a5f 0%, #2d5a87 40%, #4a6cf7 100%);
+  border-radius: var(--radius-xl);
+  padding: 36rpx 32rpx;
+  margin-bottom: 24rpx;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+/* 装饰元素 */
+.user-card::before {
+  content: "";
+  position: absolute;
+  top: -50rpx;
+  right: -30rpx;
+  width: 180rpx;
+  height: 180rpx;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.12) 0%,
+    transparent 70%
+  );
+  border-radius: 50%;
+}
+
+.user-card::after {
+  content: "";
+  position: absolute;
+  bottom: -60rpx;
+  left: 20rpx;
+  width: 120rpx;
+  height: 120rpx;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 70%
+  );
+  border-radius: 50%;
 }
 
 .avatar {
-  width: 48px;
-  height: 48px;
-  line-height: 48px;
+  width: 88rpx;
+  height: 88rpx;
+  line-height: 88rpx;
   text-align: center;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.18);
   color: #fff;
   border-radius: 50%;
-  font-size: 20px;
-  font-weight: 700;
-  margin-right: 14px;
+  font-size: 36rpx;
+  font-weight: 800;
+  margin-right: 24rpx;
+  position: relative;
+  z-index: 1;
+  border: 3rpx solid rgba(255, 255, 255, 0.25);
 }
 
 .user-info {
   flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .user-id {
-  font-size: 16px;
+  font-size: 30rpx;
   color: #fff;
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .user-hint {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 4px;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 6rpx;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
 }
 
+.user-hint::before {
+  content: "";
+  width: 10rpx;
+  height: 10rpx;
+  background: #4ade80;
+  border-radius: 50%;
+  box-shadow: 0 0 6rpx rgba(74, 222, 128, 0.5);
+}
+
+/* ══════════════════════════════════════════
+   设置区块
+   ══════════════════════════════════════════ */
 .settings-block {
-  background: #fff;
-  border-radius: 12px;
-  margin-bottom: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  margin-bottom: 20rpx;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-xs);
+  border: 1rpx solid var(--border-lighter);
 }
 
 .settings-title {
-  font-size: 13px;
-  color: #999;
-  padding: 14px 16px 6px;
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  padding: 22rpx 24rpx 10rpx;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
+/* ── 设置项 ── */
 .setting-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid #f5f5f5;
+  padding: 22rpx 24rpx;
+  border-bottom: 1rpx solid var(--border-lighter);
+  transition: background 0.15s;
+}
+
+.setting-item:active {
+  background: var(--bg-card-hover);
 }
 
 .setting-item:last-child {
@@ -67,63 +151,76 @@
 }
 
 .setting-name {
-  font-size: 15px;
-  color: #333;
+  font-size: 30rpx;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .setting-desc {
-  font-size: 12px;
-  color: #999;
-  margin-top: 2px;
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  margin-top: 4rpx;
 }
 
 .arrow {
-  font-size: 16px;
-  color: #ccc;
-  margin-left: 10px;
+  font-size: 28rpx;
+  color: var(--text-tertiary);
+  margin-left: 16rpx;
 }
 
-/* Phase 2: 标签偏好样式 */
+/* ══════════════════════════════════════════
+   标签偏好
+   ══════════════════════════════════════════ */
 .tag-section {
-  padding: 10px 16px 16px;
+  padding: 12rpx 24rpx 24rpx;
 }
 
 .tag-hint {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 12px;
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  margin-bottom: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
 }
 
 .tag-hint.selected {
-  color: #07c160;
+  color: var(--accent-green);
+  font-weight: 600;
 }
 
 .tag-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
 }
 
 .tag-chip {
   display: inline-flex;
   flex-direction: column;
-  padding: 8px 14px;
-  border-radius: 18px;
-  border: 1.5px solid #e5e5e5;
-  background: #fafafa;
-  transition: all 0.15s;
+  padding: 18rpx 24rpx;
+  border-radius: var(--radius-lg);
+  border: 2rpx solid var(--border-light);
+  background: var(--bg-card);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-width: 150rpx;
+}
+
+.tag-chip:active {
+  transform: scale(0.95);
 }
 
 .tag-chip.selected {
-  background: #07c160;
-  border-color: #07c160;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: #6366f1;
+  box-shadow: 0 6rpx 20rpx rgba(99, 102, 241, 0.35);
 }
 
 .tag-label {
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
+  font-size: 26rpx;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .tag-chip.selected .tag-label {
@@ -131,117 +228,190 @@
 }
 
 .tag-desc {
-  font-size: 10px;
-  color: #aaa;
-  margin-top: 2px;
+  font-size: 20rpx;
+  color: var(--text-tertiary);
+  margin-top: 4rpx;
 }
 
 .tag-chip.selected .tag-desc {
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* 灰色禁用态：无相关新闻的标签（优先级高于 selected） */
+/* 灰色禁用态 */
 .tag-chip.disabled {
-  background: #eeeeee !important;
-  border-color: #e0e0e0 !important;
-  opacity: 0.55;
+  background: #f5f5f5 !important;
+  border-color: #e5e5e5 !important;
+  opacity: 0.45;
 }
 
 .tag-chip.disabled .tag-label {
-  color: #999 !important;
-}
-
-.tag-chip.disabled .tag-desc {
   color: #bbb !important;
 }
 
+.tag-chip.disabled .tag-desc {
+  color: #ccc !important;
+}
+
+/* ── 保存按钮 ── */
 .save-btn {
-  background: #07c160;
+  width: 100%;
+  background: linear-gradient(135deg, #10b981, #059669);
   color: #fff;
-  font-size: 15px;
-  font-weight: 500;
-  border-radius: 8px;
-  padding: 10px 0;
+  font-size: 30rpx;
+  font-weight: 700;
+  border-radius: var(--radius-lg);
+  padding: 22rpx 0;
   border: none;
-  line-height: 1.5;
+  box-shadow: 0 4rpx 16rpx rgba(16, 185, 129, 0.3);
+  letter-spacing: 0.02em;
+  transition: all 0.2s var(--ease-out);
+}
+
+.save-btn:active {
+  transform: scale(0.98);
+  opacity: 0.9;
 }
 
 .save-btn::after {
   border: none;
 }
 
-/* Phase 3: 信源健康度样式 */
+/* ══════════════════════════════════════════
+   信源健康度
+   ══════════════════════════════════════════ */
 .health-pending-badge {
-  display: inline-block;
-  font-size: 11px;
-  color: #e74c3c;
-  background: #fde8e8;
-  border-radius: 12px;
-  padding: 2px 10px;
-  margin-left: 8px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  font-size: 20rpx;
+  color: var(--accent-red);
+  background: #fef2f2;
+  border-radius: var(--radius-full);
+  padding: 4rpx 16rpx;
+  font-weight: 600;
+  border: 1rpx solid #fecaca;
   animation: healthPulse 2s ease-in-out infinite;
 }
 
 @keyframes healthPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .health-list {
-  padding: 6px 16px 12px;
+  padding: 8rpx 24rpx 20rpx;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 10rpx;
 }
 
 .health-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 14px;
-  background: #f8f9fa;
-  border: 1px solid #eee;
-  font-size: 12px;
+  gap: 8rpx;
+  padding: 10rpx 18rpx;
+  border-radius: var(--radius-full);
+  background: var(--bg-page);
+  border: 1rpx solid var(--border-lighter);
+  font-size: 24rpx;
+  transition: all 0.15s;
+}
+
+.health-item:active {
+  box-shadow: var(--shadow-sm);
 }
 
 .health-dot {
-  width: 8px;
-  height: 8px;
+  width: 12rpx;
+  height: 12rpx;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .health-dot.green {
-  background: #27ae60;
-  box-shadow: 0 0 4px rgba(39, 174, 96, 0.4);
+  background: #22c55e;
+  box-shadow: 0 0 8rpx rgba(34, 197, 94, 0.5);
 }
 
 .health-dot.yellow {
-  background: #f39c12;
-  box-shadow: 0 0 4px rgba(243, 156, 18, 0.4);
+  background: #f59e0b;
+  box-shadow: 0 0 8rpx rgba(245, 158, 11, 0.5);
 }
 
 .health-dot.red {
-  background: #e74c3c;
-  box-shadow: 0 0 4px rgba(231, 76, 60, 0.4);
+  background: #ef4444;
+  box-shadow: 0 0 8rpx rgba(239, 68, 68, 0.5);
   animation: healthPulse 2s ease-in-out infinite;
 }
 
 .health-tag {
-  color: #333;
-  font-weight: 500;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .health-count {
-  color: #999;
-  font-size: 11px;
+  color: var(--text-tertiary);
+  font-size: 22rpx;
 }
 
 .health-hint {
-  padding: 6px 16px 14px;
-  font-size: 12px;
-  color: #999;
+  padding: 6rpx 24rpx 20rpx;
+  font-size: 24rpx;
+  color: var(--text-tertiary);
   text-align: center;
+}
+
+/* ── AI 新闻问答入口 ── */
+.chat-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: var(--radius-xl);
+  padding: 28rpx 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 6rpx 20rpx rgba(99, 102, 241, 0.25);
+  transition: all 0.2s;
+}
+
+.chat-entry-card:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+.chat-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.chat-entry-icon {
+  font-size: 56rpx;
+}
+
+.chat-entry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.chat-entry-title {
+  font-size: 32rpx;
+  color: #fff;
+  font-weight: 700;
+}
+
+.chat-entry-desc {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.chat-entry-arrow {
+  font-size: 32rpx;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
 }

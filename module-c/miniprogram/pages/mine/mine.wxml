@@ -8,6 +8,18 @@
     </view>
   </view>
 
+  <!-- AI 新闻问答入口 -->
+  <view class="chat-entry-card" bindtap="onChatEntry">
+    <view class="chat-entry-left">
+      <view class="chat-entry-icon">🤖</view>
+      <view class="chat-entry-info">
+        <view class="chat-entry-title">AI 新闻问答</view>
+        <view class="chat-entry-desc">想问什么新闻，直接问我</view>
+      </view>
+    </view>
+    <view class="chat-entry-arrow">></view>
+  </view>
+
   <!-- 标签偏好 -->
   <view class="settings-block">
     <view class="settings-title">我的兴趣标签</view>

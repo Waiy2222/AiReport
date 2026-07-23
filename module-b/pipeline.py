@@ -674,14 +674,19 @@ async def _insert_personalized_briefing(
     # asyncpg 需要 date 对象，不能传字符串
     briefing_date_obj = _date_type.fromisoformat(briefing_date)
 
-    # 使用 'zh_p' 避免与通用简报的 (type,date,language) 唯一约束冲突
+    # 为每个用户的专属简报生成唯一 language 值，避免 (type,date,language) 约束冲突
+    # VARCHAR(5), 格式: 'zp' + 用户hash后3位
+    _lang_suffix = str(hash(openid) % 1000).zfill(3)
+    _personalized_lang = f'zp{_lang_suffix}'
+
     await conn.execute(
         """INSERT INTO briefings (id, type, date, language, tl_dr, sections, key_takeaways, raw_stats,
            requested_by, interest_text, interest_tags, is_personalized)
-           VALUES ($1, $2, $3, 'zh_p', $4, $5, $6, $7, $8, $9, $10, true)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)""",
         briefing_id,
         briefing_type,
         briefing_date_obj,
+        _personalized_lang,
         json.dumps(briefing.get("tl_dr", []), ensure_ascii=False),
         json.dumps(briefing.get("sections", []), ensure_ascii=False),
         json.dumps(briefing.get("key_takeaways", []), ensure_ascii=False),

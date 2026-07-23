@@ -605,9 +605,17 @@ async def run_personalized_pipeline(
     passed = await semantic_dedup(passed)
     stats["dedup_semantic_removed"] = before_semantic - len(passed)
 
-    # 标签预过滤（核心步骤）
+    # 标签预过滤（仅当 items 有标签时才执行，否则靠摘要器后过滤）
     if filter_tags:
-        passed = _filter_items_by_tags(passed, filter_tags)
+        has_tags = any(
+            bool((_parse_metadata(it) or {}).get("tags"))
+            for it in passed
+        )
+        if has_tags:
+            passed = _filter_items_by_tags(passed, filter_tags)
+        else:
+            logger.info("No item-level tags found, skipping pre-filter, "
+                        "relying on summarizer post-filter")
 
     if not passed:
         async with pool.acquire() as conn:
@@ -656,19 +664,24 @@ async def _insert_personalized_briefing(
 ) -> uuid.UUID:
     """写入个性化简报 — 仅 INSERT（不做 upsert），每次生成都是新记录"""
     import uuid as _uuid_mod
+    from datetime import date as _date_type
     briefing_id = _uuid_mod.uuid4()
     headline = briefing.get("headline", {})
     merged_stats = dict(stats)
     if headline:
         merged_stats["headline"] = headline
 
+    # asyncpg 需要 date 对象，不能传字符串
+    briefing_date_obj = _date_type.fromisoformat(briefing_date)
+
+    # 使用 'zh_p' 避免与通用简报的 (type,date,language) 唯一约束冲突
     await conn.execute(
-        """INSERT INTO briefings (id, type, date, tl_dr, sections, key_takeaways, raw_stats,
+        """INSERT INTO briefings (id, type, date, language, tl_dr, sections, key_takeaways, raw_stats,
            requested_by, interest_text, interest_tags, is_personalized)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)""",
+           VALUES ($1, $2, $3, 'zh_p', $4, $5, $6, $7, $8, $9, $10, true)""",
         briefing_id,
         briefing_type,
-        briefing_date,
+        briefing_date_obj,
         json.dumps(briefing.get("tl_dr", []), ensure_ascii=False),
         json.dumps(briefing.get("sections", []), ensure_ascii=False),
         json.dumps(briefing.get("key_takeaways", []), ensure_ascii=False),

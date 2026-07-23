@@ -13,6 +13,55 @@
     >🌙 晚报</view>
   </view>
 
+  <!-- 个性化兴趣输入面板 -->
+  <view class="interest-panel {{interestPanelExpanded ? 'expanded' : ''}}">
+    <view class="interest-toggle" bindtap="onToggleInterestPanel">
+      <text class="interest-toggle-text">
+        {{interestPanelExpanded ? '收起定制面板 ▴' : '✨ 定制你的专属简报 ▾'}}
+      </text>
+    </view>
+    <view class="interest-body" wx:if="{{interestPanelExpanded}}">
+      <textarea
+        class="interest-textarea"
+        placeholder="输入你感兴趣的新闻领域，如：AI编程工具、自动驾驶..."
+        value="{{interestText}}"
+        bindinput="onInterestInput"
+        maxlength="200"
+        auto-height
+      />
+      <view class="quick-tags-row" wx:if="{{quickTags.length > 0}}">
+        <text
+          wx:for="{{quickTags}}"
+          wx:key="tag"
+          class="quick-tag {{item.selected ? 'selected' : ''}}"
+          data-tag="{{item.tag}}"
+          bindtap="onQuickTagTap"
+        >{{item.label_zh}}</text>
+      </view>
+      <button
+        class="generate-btn"
+        bindtap="onGenerateBriefing"
+        disabled="{{generating || !interestText}}"
+      >{{generating ? '⏳ 生成中...' : '🔍 生成我的简报'}}</button>
+    </view>
+  </view>
+
+  <!-- 生成状态蒙层 -->
+  <view class="generating-overlay" wx:if="{{generating}}">
+    <view class="generating-card">
+      <view class="generating-spinner"></view>
+      <text class="generating-text">正在为你精选新闻…</text>
+      <text class="generating-hint">预计需要 30-45 秒，请耐心等待</text>
+      <text class="generating-elapsed">{{pollCount * 2}} 秒</text>
+      <button class="cancel-btn" bindtap="onCancelGeneration">取消</button>
+    </view>
+  </view>
+
+  <!-- 个性化标记 -->
+  <view wx:if="{{isPersonalized && briefing}}" class="personalized-banner">
+    🔍 按你的兴趣生成：<text class="fw600">{{personalizedTags.join('、')}}</text>
+  </view>
+
   <!-- 加载中 -->
   <view wx:if="{{loading}}" class="loading">
     <view class="loading-spinner"></view>
@@ -43,9 +92,9 @@
       <view class="headline-badge">🔥 头条</view>
       <view class="headline-title">{{briefing.headline.title}}</view>
       <view class="headline-summary">{{briefing.headline.summary}}</view>
-      <view class="headline-tags">
+      <view wx:if="{{headlineItem.tags && headlineItem.tags.length > 0}}" class="headline-tags">
         <text wx:for="{{headlineItem.tags}}" wx:key="*this" class="htag">{{item}}</text>
-        <text class="htag score">{{headlineItem.score}}分</text>
+        <text wx:if="{{headlineItem.score}}" class="htag score">{{headlineItem.score}}分</text>
       </view>
     </view>
 

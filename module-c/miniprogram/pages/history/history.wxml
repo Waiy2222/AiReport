@@ -15,9 +15,6 @@
       <view class="filter-chip {{filterType === '' ? 'active' : ''}}" data-type="" bindtap="onFilterType">全部</view>
       <view class="filter-chip {{filterType === 'morning' ? 'active' : ''}}" data-type="morning" bindtap="onFilterType">☀️ 早报</view>
       <view class="filter-chip {{filterType === 'evening' ? 'active' : ''}}" data-type="evening" bindtap="onFilterType">🌙 晚报</view>
-      <view class="filter-divider"></view>
-      <view class="filter-chip {{filterDate === '7d' ? 'active' : ''}}" data-date="7d" bindtap="onFilterDate">最近7天</view>
-      <view class="filter-chip {{filterDate === '30d' ? 'active' : ''}}" data-date="30d" bindtap="onFilterDate">最近30天</view>
     </view>
 
     <!-- 标签筛选 -->
@@ -26,8 +23,15 @@
       <view wx:for="{{tags}}" wx:key="tag" class="filter-chip tag-chip {{filterTag === item.tag ? 'active' : ''}}" data-tag="{{item.tag}}" bindtap="onSelectTag">{{item.label_zh || item.tag}}</view>
     </view>
 
+    <!-- 简报类型筛选 -->
+    <view class="filter-row" style="margin-top: 16rpx;">
+      <text class="filter-label">类型：</text>
+      <view class="filter-chip {{briefType === 'personalized' ? 'active' : ''}}" data-btype="personalized" bindtap="onFilterBriefType">我的专属</view>
+      <view class="filter-chip {{briefType === 'general' ? 'active' : ''}}" data-btype="general" bindtap="onFilterBriefType">通用简报</view>
+    </view>
+
     <!-- 清除筛选 -->
-    <view wx:if="{{filterType || filterTag || filterDate}}" class="clear-filters" bindtap="onClearFilters">
+    <view wx:if="{{filterType || filterTag || filterDate || briefType}}" class="clear-filters" bindtap="onClearFilters">
       <text>✕ 清除筛选</text>
     </view>
   </view>
@@ -59,13 +63,16 @@
       <view class="hcard-top">
         <view class="hcard-type {{item.type}}">{{item.type === 'morning' ? '☀️ 早报' : '🌙 晚报'}}</view>
         <view class="hcard-date">{{item.dateText}}</view>
-        <view class="hcard-ago">{{item.timeAgoText}}</view>
       </view>
       <view class="hcard-points">
         <view wx:for="{{item.tlDrPreview}}" wx:for-item="p" wx:key="*this" class="hcard-point">
           <text class="hpoint-dot">{{index + 1}}</text>
           <text>{{p}}</text>
         </view>
+      </view>
+      <!-- 个性化标记 -->
+      <view wx:if="{{item.isPersonalized && item.interestText}}" class="personalized-card-tag">
+        🔍 {{item.interestText}}
       </view>
       <!-- 标签 -->
       <view wx:if="{{item.tags.length > 0}}" class="hcard-tags">
@@ -89,7 +96,7 @@
 
   <!-- 空 -->
   <view wx:if="{{!loading && list.length === 0}}">
-    <view wx:if="{{keyword || filterType || filterTag || filterDate}}" class="empty-state">
+    <view wx:if="{{keyword || filterType || filterTag}}" class="empty-state">
       <text class="empty-icon">🔍</text>
       <text>未找到匹配的简报</text>
       <text class="empty-hint" bindtap="onClearFilters">清除筛选条件</text>

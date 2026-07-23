@@ -12,13 +12,18 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
 import json
+import asyncio
+from datetime import datetime, timezone
+import uuid
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 
-from db import get_pool, init_db, close_db
+from db import get_pool, init_db, close_db, migrate_personalized_briefings
 from models import SubscribeRequest, UnsubscribeRequest, PushRequest
+from models import GenerateRequest, GenerateResponse, TaskStatusResponse
+from models import MyBriefingsResponse, MyBriefingItem
 from mock_data import get_briefings, get_subscriptions
 
 # Phase 3: 引入 source_agent（module-a），用于信源健康度 API
@@ -43,6 +48,15 @@ app = FastAPI(title="Module C - WeChat Mini Program + OA Backend")
 # 数据库是否可用
 _db_ok = False
 
+# ── 个性化简报：任务存储与模块引用 ────────────────────────────────
+# 内存任务存储：task_id → {status, briefing_id, error, created_at}
+_task_store: dict[str, dict] = {}
+# 用户级任务锁：openid → task_id（同一用户只能有一个进行中任务）
+_user_tasks: dict[str, str] = {}
+# 延迟加载的模块引用
+_interest_parser = None
+_pipeline_module = None
+
 # 注册 Phase 2 路由模块
 from tags import router as tags_router, set_db_pool as set_tags_db_pool
 app.include_router(tags_router)
@@ -58,17 +72,34 @@ app.include_router(chat_router)
 
 @app.on_event("startup")
 async def startup():
-    global _db_ok
+    global _db_ok, _interest_parser, _pipeline_module
     try:
         await init_db()
         pool = get_pool()
         async with pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
         _db_ok = True
+        await migrate_personalized_briefings(pool)
         set_tags_db_pool(pool)
         set_trends_db_pool(pool)
         set_chat_db_pool(pool)
         print("[module-c] PostgreSQL connected")
+
+        # 加载个性化简报模块（module-b 需要在 sys.path 中，因为 pipeline
+        # 使用 `from ai.xxx import` 的绝对导入方式）
+        _module_b_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "module-b",
+        )
+        if _module_b_dir not in sys.path:
+            sys.path.insert(0, _module_b_dir)
+
+        _pl_path = os.path.join(_module_b_dir, "pipeline.py")
+        if os.path.exists(_pl_path):
+            _pl_spec = importlib.util.spec_from_file_location("pipeline_mod", _pl_path)
+            _pipeline_module = importlib.util.module_from_spec(_pl_spec)
+            _pl_spec.loader.exec_module(_pipeline_module)
+            print("[module-c] pipeline module loaded for personalized briefings")
     except Exception:
         _db_ok = False
         print("[module-c] PostgreSQL not available, using mock data")
@@ -84,6 +115,16 @@ def _db():
     if not _db_ok:
         raise RuntimeError("db unavailable")
     return get_pool()
+
+
+def _parse_json_field(val):
+    """解析数据库中的 JSON 字段：字符串→解析，已是 list/dict 直接返回"""
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
+            return val
+    return val
 
 
 def _normalize_sections(sections):
@@ -138,9 +179,9 @@ async def get_latest(type: str = Query(..., description="morning or evening")):
             "type": row["type"],
             "date": str(row["date"]),
             "headline": raw_stats.get("headline", {}),
-            "tl_dr": row["tl_dr"],
+            "tl_dr": _parse_json_field(row["tl_dr"]),
             "sections": _normalize_sections(row["sections"]),
-            "key_takeaways": row["key_takeaways"],
+            "key_takeaways": _parse_json_field(row["key_takeaways"]),
             "raw_stats": raw_stats,
             "generated_at": row["generated_at"].isoformat(),
         }
@@ -241,7 +282,7 @@ async def get_history(
                 "id": str(r["id"]),
                 "type": r["type"],
                 "date": str(r["date"]),
-                "tl_dr": r["tl_dr"],
+                "tl_dr": _parse_json_field(r["tl_dr"]),
                 "sections": _normalize_sections(r["sections"]),
                 "generated_at": r["generated_at"].isoformat(),
             }
@@ -306,9 +347,9 @@ async def get_briefing_detail(briefing_id: str):
             "type": row["type"],
             "date": str(row["date"]),
             "language": row["language"],
-            "tl_dr": row["tl_dr"],
+            "tl_dr": _parse_json_field(row["tl_dr"]),
             "sections": _normalize_sections(row["sections"]),
-            "key_takeaways": row["key_takeaways"],
+            "key_takeaways": _parse_json_field(row["key_takeaways"]),
             "raw_stats": row["raw_stats"],
             "generated_at": row["generated_at"].isoformat(),
         }
@@ -417,8 +458,8 @@ async def push(req: PushRequest):
                 "id": str(briefing_row["id"]),
                 "type": briefing_row["type"],
                 "date": str(briefing_row["date"]),
-                "tl_dr": briefing_row["tl_dr"],
-                "sections": briefing_row["sections"],
+                "tl_dr": _parse_json_field(briefing_row["tl_dr"]),
+                "sections": _parse_json_field(briefing_row["sections"]),
             }
         except RuntimeError:
             briefing = next((b for b in get_briefings() if b["id"] == req.briefing_id), None)
@@ -441,8 +482,8 @@ async def push(req: PushRequest):
                 "id": str(briefing_row["id"]),
                 "type": briefing_row["type"],
                 "date": str(briefing_row["date"]),
-                "tl_dr": briefing_row["tl_dr"],
-                "sections": briefing_row["sections"],
+                "tl_dr": _parse_json_field(briefing_row["tl_dr"]),
+                "sections": _parse_json_field(briefing_row["sections"]),
             }
         except RuntimeError:
             for b in get_briefings():
@@ -737,3 +778,230 @@ async def approve_source(source_id: str = Query(..., description="推荐信源 I
             "approved_at": row["approved_at"].isoformat() if row["approved_at"] else None,
         },
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+# 个性化简报 API
+# ══════════════════════════════════════════════════════════════════
+
+
+def _load_interest_parser():
+    """延迟加载 interest_parser 模块"""
+    import importlib.util
+    _ip_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "module-b", "ai", "interest_parser.py",
+    )
+    if not os.path.exists(_ip_path):
+        raise RuntimeError("interest_parser module not found")
+    _ip_spec = importlib.util.spec_from_file_location("interest_parser", _ip_path)
+    _ip_mod = importlib.util.module_from_spec(_ip_spec)
+    _ip_spec.loader.exec_module(_ip_mod)
+    return _ip_mod
+
+
+async def _run_personalized_generation(
+    task_id: str,
+    pool,
+    briefing_type: str,
+    briefing_date: str,
+    filter_tags: list[str],
+    openid: str,
+    interest_text: str,
+    interest_tags: list[str],
+):
+    """后台执行个性化简报生成，完成后更新 _task_store"""
+    try:
+        # 查找最新 batch 的 raw_items
+        async with pool.acquire() as conn:
+            latest_batch = await conn.fetchval(
+                "SELECT batch_id FROM raw_items ORDER BY fetched_at DESC LIMIT 1"
+            )
+            if not latest_batch:
+                _task_store[task_id]["status"] = "failed"
+                _task_store[task_id]["error"] = "暂无新闻数据，请稍后再试"
+                return
+
+            rows = await conn.fetch(
+                "SELECT id, source, title, url, content, author, published_at, metadata, batch_id "
+                "FROM raw_items WHERE batch_id = $1",
+                latest_batch,
+            )
+
+        items = [dict(r) for r in rows]
+
+        if not items:
+            _task_store[task_id]["status"] = "failed"
+            _task_store[task_id]["error"] = "暂无新闻数据，请稍后再试"
+            return
+
+        # 同步 metadata 中的 tags 和 ai_score 到 item 顶层
+        for it in items:
+            meta = it.get("metadata")
+            if isinstance(meta, str):
+                try:
+                    meta = json.loads(meta)
+                except Exception:
+                    meta = {}
+            if not isinstance(meta, dict):
+                meta = {}
+            if not it.get("tags") and meta.get("tags"):
+                it["tags"] = meta["tags"]
+            if not it.get("ai_score") and meta.get("ai_score"):
+                it["ai_score"] = float(meta["ai_score"])
+            it["metadata"] = meta
+
+        # 运行轻量流水线
+        result = await _pipeline_module.run_personalized_pipeline(
+            pool=pool,
+            briefing_type=briefing_type,
+            briefing_date=briefing_date,
+            filter_tags=filter_tags,
+            openid=openid,
+            interest_text=interest_text,
+            interest_tags=interest_tags,
+            passed_items=items,
+        )
+
+        _task_store[task_id]["status"] = "completed"
+        _task_store[task_id]["briefing_id"] = str(result["briefing_id"])
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        _task_store[task_id]["status"] = "failed"
+        _task_store[task_id]["error"] = str(e)[:200]
+
+
+@app.post("/api/briefings/generate", response_model=GenerateResponse)
+async def generate_briefing(req: GenerateRequest):
+    """触发个性化简报生成"""
+    if _pipeline_module is None:
+        raise HTTPException(503, "Personalized briefing service not available")
+
+    # ① 输入校验：敏感词 + 新闻相关性
+    try:
+        _ip = _load_interest_parser()
+        validation = await _ip.validate_input(req.interest_text)
+        if not validation["valid"]:
+            return GenerateResponse(
+                task_id="",
+                status="rejected",
+                valid=False,
+                error=validation["error"],
+            )
+    except Exception as e:
+        # 校验模块加载失败不阻塞用户，跳过校验
+        print(f"[generate] interest_parser unavailable, skipping validation: {e}")
+
+    # ② LLM 兴趣解析
+    all_tags = list(req.tags)
+    try:
+        _ip = _load_interest_parser()
+        parsed = await _ip.parse_interests(req.interest_text)
+        all_tags = list(set(parsed.get("tags", []) + req.tags))
+    except Exception as e:
+        print(f"[generate] interest parsing failed: {e}")
+        all_tags = list(req.tags)
+
+    if not all_tags:
+        return GenerateResponse(
+            task_id="",
+            status="rejected",
+            valid=False,
+            error="未能从你的描述中识别出新闻领域，请尝试用更具体的词汇描述",
+        )
+
+    # ③ 用户级并发控制：取消旧任务
+    task_id = str(uuid.uuid4())
+    old_task_id = _user_tasks.get(req.openid)
+    if old_task_id and old_task_id in _task_store:
+        if _task_store[old_task_id].get("status") == "processing":
+            _task_store[old_task_id]["status"] = "cancelled"
+            _task_store[old_task_id]["error"] = "Replaced by newer request"
+    _user_tasks[req.openid] = task_id
+
+    # ④ 存入任务记录
+    _task_store[task_id] = {
+        "status": "processing",
+        "briefing_id": None,
+        "error": None,
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    # ⑤ 启动后台生成任务
+    pool = _db()
+    briefing_date = datetime.now().strftime("%Y-%m-%d")
+
+    asyncio.create_task(
+        _run_personalized_generation(
+            task_id=task_id,
+            pool=pool,
+            briefing_type=req.type,
+            briefing_date=briefing_date,
+            filter_tags=all_tags,
+            openid=req.openid,
+            interest_text=req.interest_text,
+            interest_tags=all_tags,
+        )
+    )
+
+    return GenerateResponse(task_id=task_id, status="processing", valid=True)
+
+
+@app.get("/api/briefings/generate/{task_id}", response_model=TaskStatusResponse)
+async def get_generation_status(task_id: str):
+    """轮询个性化简报生成状态"""
+    task = _task_store.get(task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+
+    return TaskStatusResponse(
+        task_id=task_id,
+        status=task["status"],
+        briefing_id=task.get("briefing_id"),
+        error=task.get("error"),
+    )
+
+
+@app.get("/api/briefings/my", response_model=MyBriefingsResponse)
+async def get_my_briefings(
+    openid: str = Query(...),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+):
+    """获取用户的专属简报历史"""
+    try:
+        pool = _db()
+        offset = (page - 1) * size
+
+        total = await pool.fetchval(
+            "SELECT COUNT(*) FROM briefings WHERE requested_by = $1 AND is_personalized = true",
+            openid,
+        )
+
+        rows = await pool.fetch(
+            """SELECT id, type, date, interest_text, interest_tags, sections, generated_at
+               FROM briefings
+               WHERE requested_by = $1 AND is_personalized = true
+               ORDER BY date DESC, generated_at DESC
+               OFFSET $2 LIMIT $3""",
+            openid, offset, size,
+        )
+
+        items = [
+            MyBriefingItem(
+                id=str(r["id"]),
+                type=r["type"],
+                date=str(r["date"]),
+                interest_text=r["interest_text"],
+                interest_tags=_parse_json_field(r["interest_tags"]),
+                sections=_normalize_sections(r["sections"]),
+                generated_at=r["generated_at"].isoformat(),
+            )
+            for r in rows
+        ]
+
+        return MyBriefingsResponse(page=page, size=size, total=total or 0, items=items)
+    except RuntimeError:
+        return MyBriefingsResponse(page=page, size=size, total=0, items=[])

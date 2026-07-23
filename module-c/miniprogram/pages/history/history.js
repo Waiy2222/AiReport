@@ -16,9 +16,9 @@ Page({
     // 筛选
     filterType: "",    // "" | "morning" | "evening"
     filterTag: "",     // 标签筛选
-    filterDate: "",    // "" | "7d" | "30d"
     tags: [],          // 可用标签列表
     showTagPicker: false,
+    briefType: "",     // "" | "personalized" | "general" — 简报类型筛选
   },
 
   onLoad(options) {
@@ -37,7 +37,11 @@ Page({
   onReachBottom() {
     if (this.data.noMore || this.data.loading) return;
     this.setData({ page: this.data.page + 1 });
-    this.fetchList();
+    if (this.data.briefType === "personalized") {
+      this._fetchMyBriefings();
+    } else {
+      this.fetchList();
+    }
   },
 
   onSearchInput(e) {
@@ -71,27 +75,61 @@ Page({
     this.fetchList({ filterTag: newTag });
   },
 
-  // 日期快捷筛选
-  onFilterDate(e) {
-    const d = e.currentTarget.dataset.date;
-    const newDate = this.data.filterDate === d ? "" : d;
-    console.log('[history] onFilterDate:', d, '→ newDate:', newDate);
-    this.setData({ filterDate: newDate, page: 1, list: [], noMore: false });
-    this.fetchList({ filterDate: newDate });
-  },
-
   // 清除所有筛选
   onClearFilters() {
     this.setData({
       filterType: "",
       filterTag: "",
-      filterDate: "",
       keyword: "",
+      briefType: "",
       page: 1,
       list: [],
       noMore: false,
     });
-    this.fetchList({ filterType: "", filterTag: "", filterDate: "", keyword: "" });
+    this.fetchList({ filterType: "", filterTag: "", keyword: "" });
+  },
+
+  // 简报类型筛选（专属/通用）
+  onFilterBriefType(e) {
+    var t = e.currentTarget.dataset.btype;
+    var newType = this.data.briefType === t ? "" : t;
+    this.setData({ briefType: newType, page: 1, list: [], noMore: false });
+    if (newType === "personalized") {
+      this._fetchMyBriefings();
+    } else {
+      this.fetchList();
+    }
+  },
+
+  async _fetchMyBriefings() {
+    this.setData({ loading: true });
+    try {
+      var openid = getApp().globalData.openid || "anonymous";
+      var data = await api.getMyBriefings(openid, this.data.page, this.data.size);
+      var items = (data.items || []).map(function (item) {
+        return {
+          id: item.id,
+          type: item.type,
+          date: item.date,
+          dateText: formatDate(item.date),
+          timeAgoText: timeAgo(item.generated_at),
+          isPersonalized: true,
+          interestText: item.interest_text || "",
+          interestTags: item.interest_tags || [],
+          tlDrPreview: [],
+          tags: item.interest_tags || [],
+        };
+      });
+      this.setData({
+        list: items,
+        total: data.total,
+        loading: false,
+        noMore: items.length >= data.total,
+      });
+    } catch (e) {
+      console.error("fetch my briefings failed:", e);
+      this.setData({ loading: false });
+    }
   },
 
   async fetchTags() {
@@ -106,29 +144,22 @@ Page({
   },
 
   async fetchList(overrides = {}) {
+    // 如果已切换到专属简报，走专属接口
+    if (this.data.briefType === "personalized") {
+      return this._fetchMyBriefings();
+    }
+
     this.setData({ loading: true });
 
     // 使用显式传入的 filter 值（优先），回退到 this.data
     const filterType = overrides.filterType !== undefined ? overrides.filterType : this.data.filterType;
     const filterTag = overrides.filterTag !== undefined ? overrides.filterTag : this.data.filterTag;
-    const filterDate = overrides.filterDate !== undefined ? overrides.filterDate : this.data.filterDate;
     const keyword = overrides.keyword !== undefined ? overrides.keyword : this.data.keyword;
-
-    // 计算日期范围
-    let dateFrom = "";
-    let dateTo = "";
-    if (filterDate) {
-      const now = new Date();
-      dateTo = now.toISOString().split("T")[0];
-      const days = filterDate === "7d" ? 7 : 30;
-      const from = new Date(now.getTime() - days * 86400000);
-      dateFrom = from.toISOString().split("T")[0];
-    }
 
     const filters = {
       type: filterType,
-      dateFrom,
-      dateTo,
+      dateFrom: "",
+      dateTo: "",
       tag: filterTag,
     };
 

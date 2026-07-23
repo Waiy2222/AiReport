@@ -99,3 +99,44 @@ class UserProfile(BaseModel):
     tags: list[str]
     recent_clicks: list[UserClickSummary]
     weight_map: dict[str, float]
+
+
+# ── 个性化简报模型 ────────────────────────────────────────────────
+
+
+class GenerateRequest(BaseModel):
+    openid: str = "anonymous"
+    interest_text: str = Field(min_length=1, max_length=500)
+    tags: list[str] = Field(default_factory=list)
+    type: str = Field(default="morning", description="morning / evening")
+
+
+class GenerateResponse(BaseModel):
+    task_id: str
+    status: str = "processing"
+    valid: bool = True
+    error: str | None = None
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str  # "processing" | "completed" | "failed"
+    briefing_id: str | None = None
+    error: str | None = None
+
+
+class MyBriefingItem(BaseModel):
+    id: str
+    type: str
+    date: str
+    interest_text: str | None = None
+    interest_tags: list[str] = Field(default_factory=list)
+    sections: list[dict] = Field(default_factory=list)
+    generated_at: str
+
+
+class MyBriefingsResponse(BaseModel):
+    page: int
+    size: int
+    total: int
+    items: list[MyBriefingItem]

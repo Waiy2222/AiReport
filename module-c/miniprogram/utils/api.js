@@ -108,4 +108,26 @@ module.exports = {
     return request("/api/chat/suggestions");
   },
 
+  // 个性化简报
+  generateBriefing(openid, interestText, tags, type) {
+    return request("/api/briefings/generate", "POST", {
+      openid: openid || "anonymous",
+      interest_text: interestText,
+      tags: tags || [],
+      type: type || "morning",
+    });
+  },
+
+  getGenerateStatus(taskId) {
+    return request(`/api/briefings/generate/${encodeURIComponent(taskId)}`);
+  },
+
+  getMyBriefings(openid, page, size) {
+    const p = page || 1;
+    const s = size || 20;
+    return request(
+      `/api/briefings/my?openid=${encodeURIComponent(openid || "anonymous")}&page=${p}&size=${s}`
+    );
+  },
+
 };

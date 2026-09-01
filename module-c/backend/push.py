@@ -44,7 +44,13 @@ async def send_subscribe_message(
     """发送单条订阅消息"""
     url = f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={access_token}"
 
-    title = briefing["tl_dr"][0] if briefing["tl_dr"] else "AI资讯简报"
+    tl_dr = briefing.get("tl_dr", [])
+    if isinstance(tl_dr, str):
+        try:
+            tl_dr = json.loads(tl_dr)
+        except (json.JSONDecodeError, TypeError):
+            tl_dr = []
+    title = tl_dr[0] if tl_dr else "AI资讯简报"
     btype = "早报" if briefing["type"] == "morning" else "晚报"
 
     body = {
@@ -83,9 +89,23 @@ def filter_briefing_by_tags(briefing: dict, user_tags: list[str]) -> dict:
     tag_set = set(user_tags)
     filtered_sections = []
 
-    for section in briefing.get("sections", []):
+    sections = briefing.get("sections", [])
+    if isinstance(sections, str):
+        sections = json.loads(sections)
+
+    for section in sections:
+        if isinstance(section, str):
+            try:
+                section = json.loads(section)
+            except (json.JSONDecodeError, TypeError):
+                continue
         matched_items = []
         for item in section.get("items", []):
+            if isinstance(item, str):
+                try:
+                    item = json.loads(item)
+                except (json.JSONDecodeError, TypeError):
+                    continue
             item_tags = set(item.get("tags", []))
             if item_tags & tag_set:
                 matched_items.append(item)

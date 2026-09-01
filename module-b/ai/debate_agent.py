@@ -22,12 +22,12 @@ from .prompts import (
 
 logger = logging.getLogger(__name__)
 
-# 只辩论 Agent/智能体 领域的新闻
-DEBATE_TAG = "Agent"
+# 辩论覆盖除体育外的全部标签
+DEBATE_TAGS = {"LLM", "Agent", "开源", "工具", "科技", "行业", "全球", "芯片", "机器人", "自动驾驶", "融资", "医疗"}
 # 每次简报最多辩论条数
-DEBATE_MAX_COUNT = 3
-# 辩论阈值：评分低于此值的 Agent 新闻不辩论
-DEBATE_THRESHOLD = 6
+DEBATE_MAX_COUNT = 12
+# 辩论阈值：0=不限
+DEBATE_THRESHOLD = 0
 
 # 角色配置: (角色名, system_prompt, 视角缩写)
 PERSONAS = [
@@ -90,26 +90,21 @@ async def _debate_single(item: dict) -> dict:
 
     # 计算共识/争议度（基于三方可否给出有效观点）
     valid_count = sum(1 for v in debate.values() if v and "暂不可用" not in v)
-    if valid_count == 3:
-        consensus = "三方均给出了独立分析"
-        controversy = 3
-    elif valid_count == 2:
-        consensus = "两方给出有效分析"
-        controversy = 5
-    elif valid_count == 1:
-        consensus = "仅一方给出分析"
-        controversy = 7
-    else:
-        consensus = "三方分析暂不可用"
-        controversy = 0
+    if valid_count < 3:
+        # 凑不齐三方 → 跳过该条辩论，不写入 metadata
+        logger.info(
+            "Debate skipped for '%s': only %d/3 personas responded (need all 3)",
+            item.get("title", "?")[:60],
+            valid_count,
+        )
+        return None
 
-    debate["consensus"] = consensus
-    debate["controversy"] = controversy
-
+    debate["consensus"] = "三方均给出了独立分析"
+    debate["controversy"] = 3
     return debate
 
 
-async def run_debate(items: list[dict]) -> list[dict]:
+async def run_debate(items: list[dict], skip_tag_filter: bool = False) -> list[dict]:
     """主入口：只对 Agent/智能体 标签的新闻跑三方辩论，最多 3 条
 
     Args:
@@ -118,12 +113,17 @@ async def run_debate(items: list[dict]) -> list[dict]:
     Returns:
         传入的 items，Agent 新闻的 item["metadata"]["debate"] 已填充辩论结果
     """
-    # ① 筛选：只取 Agent 标签 + 评分 ≥ 阈值的新闻
-    agent_items = [
-        it for it in items
-        if DEBATE_TAG in (it.get("tags") or [])
-        and it.get("ai_score", 0) >= DEBATE_THRESHOLD
-    ]
+    # ① 筛选
+    if skip_tag_filter:
+        agent_items = [it for it in items if it.get("ai_score", 0) >= DEBATE_THRESHOLD]
+    else:
+        _FORBIDDEN = {"体育", "安全"}
+        agent_items = [
+            it for it in items
+            if any(t in DEBATE_TAGS for t in (it.get("tags") or []))
+            and not any(t in _FORBIDDEN for t in (it.get("tags") or []))
+            and it.get("ai_score", 0) >= DEBATE_THRESHOLD
+        ]
 
     # ② 按评分降序，取前 DEBATE_MAX_COUNT 条
     agent_items.sort(key=lambda x: x.get("ai_score", 0), reverse=True)
@@ -131,14 +131,14 @@ async def run_debate(items: list[dict]) -> list[dict]:
 
     if not debate_items:
         logger.info(
-            "Debate skipped: no Agent-tagged items above threshold %d",
-            DEBATE_THRESHOLD,
+            "Debate skipped: no AI-core items above threshold %d (tags=%s)",
+            DEBATE_THRESHOLD, DEBATE_TAGS,
         )
         return items
 
     logger.info(
-        "Starting debate for %d Agent-tagged items (max=%d, threshold >= %d, total items=%d)",
-        len(debate_items), DEBATE_MAX_COUNT, DEBATE_THRESHOLD, len(items),
+        "Starting debate for %d AI-core items (tags=%s, max=%d, threshold>=%d, total=%d)",
+        len(debate_items), DEBATE_TAGS, DEBATE_MAX_COUNT, DEBATE_THRESHOLD, len(items),
     )
 
     # 并行对所有高分新闻跑辩论
@@ -147,6 +147,7 @@ async def run_debate(items: list[dict]) -> list[dict]:
         return_exceptions=True,
     )
 
+    debate_count = 0
     for item, result in zip(debate_items, debate_results):
         if isinstance(result, Exception):
             logger.warning(
@@ -154,13 +155,11 @@ async def run_debate(items: list[dict]) -> list[dict]:
                 item.get("title", "?")[:50],
                 result,
             )
-            result = {
-                "tech_view": "分析暂不可用",
-                "biz_view": "分析暂不可用",
-                "social_view": "分析暂不可用",
-                "consensus": "辩论异常",
-                "controversy": 0,
-            }
+            continue
+
+        # 凑不齐三方 → 跳过，不写入 metadata
+        if result is None:
+            continue
 
         # 将辩论结果写入 metadata
         if isinstance(item.get("metadata"), str):
@@ -172,6 +171,7 @@ async def run_debate(items: list[dict]) -> list[dict]:
             item["metadata"] = {}
 
         item["metadata"]["debate"] = result
+        debate_count += 1
 
-    logger.info("Debate completed for %d items", len(debate_items))
+    logger.info("Debate completed for %d items (targeted %d)", debate_count, len(debate_items))
     return items

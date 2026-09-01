@@ -89,14 +89,18 @@ def _hn_time(item: dict) -> datetime:
     return _parse_hn_time(item.get("time"))
 
 
+_EPOCH_HN = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
 def _parse_hn_time(ts: int | None) -> datetime:
-    """Unix timestamp → UTC datetime"""
+    """Unix timestamp → UTC datetime。解析失败返回 epoch（非 now()），
+    确保无时间戳的旧条目被 since 过滤拦截。"""
     if ts is None:
-        return datetime.now(timezone.utc)
+        return _EPOCH_HN
     try:
         return datetime.fromtimestamp(int(ts), tz=timezone.utc)
     except (ValueError, OverflowError, OSError):
-        return datetime.now(timezone.utc)
+        return _EPOCH_HN
 
 
 async def fetch(pool, since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:

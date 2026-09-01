@@ -10,28 +10,23 @@
 
   <!-- 筛选栏 -->
   <view class="filter-bar">
-    <!-- 类型切换 -->
+    <!-- 早晚类型 -->
     <view class="filter-row">
       <view class="filter-chip {{filterType === '' ? 'active' : ''}}" data-type="" bindtap="onFilterType">全部</view>
-      <view class="filter-chip {{filterType === 'morning' ? 'active' : ''}}" data-type="morning" bindtap="onFilterType">☀️ 早报</view>
-      <view class="filter-chip {{filterType === 'evening' ? 'active' : ''}}" data-type="evening" bindtap="onFilterType">🌙 晚报</view>
+      <view class="filter-chip {{filterType === 'morning' ? 'active' : ''}}" data-type="morning" bindtap="onFilterType">☀️ 早间</view>
+      <view class="filter-chip {{filterType === 'evening' ? 'active' : ''}}" data-type="evening" bindtap="onFilterType">🌙 晚间</view>
     </view>
 
     <!-- 标签筛选 -->
-    <view class="tag-row-wrap">
-      <view class="filter-chip tag-chip {{filterTag === '' ? 'active' : ''}}" data-tag="" bindtap="onSelectTag">全部标签</view>
-      <view wx:for="{{tags}}" wx:key="tag" class="filter-chip tag-chip {{filterTag === item.tag ? 'active' : ''}}" data-tag="{{item.tag}}" bindtap="onSelectTag">{{item.label_zh || item.tag}}</view>
-    </view>
-
-    <!-- 简报类型筛选 -->
-    <view class="filter-row" style="margin-top: 16rpx;">
-      <text class="filter-label">类型：</text>
-      <view class="filter-chip {{briefType === 'personalized' ? 'active' : ''}}" data-btype="personalized" bindtap="onFilterBriefType">我的专属</view>
-      <view class="filter-chip {{briefType === 'general' ? 'active' : ''}}" data-btype="general" bindtap="onFilterBriefType">通用简报</view>
-    </view>
+    <scroll-view class="tag-row-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="tag-row-wrap">
+        <view class="filter-chip tag-chip {{filterTag === '' ? 'active' : ''}}" data-tag="" bindtap="onSelectTag">全部标签</view>
+        <view wx:for="{{tags}}" wx:key="tag" class="filter-chip tag-chip {{filterTag === item.tag ? 'active' : ''}}" data-tag="{{item.tag}}" bindtap="onSelectTag">{{item.label_zh || item.tag}}</view>
+      </view>
+    </scroll-view>
 
     <!-- 清除筛选 -->
-    <view wx:if="{{filterType || filterTag || filterDate || briefType}}" class="clear-filters" bindtap="onClearFilters">
+    <view wx:if="{{filterType || filterTag}}" class="clear-filters" bindtap="onClearFilters">
       <text>✕ 清除筛选</text>
     </view>
   </view>

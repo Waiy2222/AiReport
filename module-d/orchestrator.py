@@ -14,6 +14,7 @@ _PLATFORM_MODULES = {
     "weixin_oa": "platforms.weixin_oa",
     "zhihu": "platforms.zhihu",
     "csdn": "platforms.csdn",
+    "douyin": "platforms.douyin",
 }
 
 

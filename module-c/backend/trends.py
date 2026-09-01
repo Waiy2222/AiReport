@@ -34,9 +34,9 @@ router = APIRouter(prefix="/api", tags=["trends"])
 # 数据库连接池（由 main.py startup 设置）
 _db_pool = None
 
-# 简单缓存：避免短时间内重复计算趋势
-_cache: dict = {"ts": None, "data": None}
-_CACHE_TTL = 300  # 5 分钟内返回缓存
+# 缓存：全量 + 按标签分桶
+_cache: dict = {"ts": None, "data": None, "by_tag": {}}
+_CACHE_TTL = 300  # 5 分钟
 
 # tag → 中文标签映射（与 module-b 14标签体系对齐）
 _TAG_LABELS = {
@@ -60,43 +60,71 @@ def set_db_pool(pool):
 
 
 @router.get("/trends/weekly")
-async def get_weekly_trends():
-    """返回近 7 天每日事件时间线。从简报数据提取真实事件，按日分组。"""
-    # 缓存：5分钟内重复请求直接返回
+async def get_weekly_trends(tags: str = "", openid: str = ""):
+    """返回近7天趋势 — 只看个性化简报数据。
+
+    Query params:
+        tags: 逗号分隔的兴趣标签（如 "电竞,环保"）
+        openid: 用户标识，有值时只看该用户的个性化简报
+    """
+    interest_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+    user_openid = openid.strip() if openid else ""
+
+    # 缓存：按 openid+tags 分桶
     now = datetime.now()
-    if _cache["ts"] and _cache["data"] and (now - _cache["ts"]).seconds < _CACHE_TTL:
-        return _cache["data"]
+    cache_key = f"{user_openid}:{tags}" if user_openid else (tags or "__all__")
+    entry = _cache.get("by_tag", {}).get(cache_key)
+    if entry and entry.get("ts") and (now - entry["ts"]).seconds < _CACHE_TTL:
+        return entry["data"]
 
     today = date.today()
     start = today - timedelta(days=6)
 
     try:
-        result = await _build_daily_timeline(start, today)
-        _cache["ts"] = now
-        _cache["data"] = result
+        if user_openid:
+            result = await _build_personalized_timeline(start, today, user_openid, interest_tags)
+        elif interest_tags:
+            result = await _build_daily_timeline(start, today, interest_tags)
+        else:
+            result = await _build_daily_timeline(start, today)
+        _cache["by_tag"][cache_key] = {"ts": now, "data": result}
         return result
     except Exception:
         logger.exception("get_weekly_trends failed, using mock fallback")
         return _mock_daily_timeline(today, start)
 
 
-async def _build_daily_timeline(start: date, today: date) -> dict:
-    """从 DB 简报中提取近 7 天每日头条事件"""
+async def _build_personalized_timeline(start: date, today: date, openid: str, interest_tags: list[str]) -> dict:
+    """只从该用户自己的个性化简报中提取趋势数据"""
     if _db_pool is None:
         return _mock_daily_timeline(today, start)
 
     rows = await _db_pool.fetch(
-        """SELECT id, type, date, sections, raw_stats
+        """SELECT id, type, date, sections, is_personalized, interest_tags
            FROM briefings
-           WHERE date >= $1 AND date <= $2 AND language = 'zh'
-           ORDER BY date DESC, type ASC""",
-        start, today,
+           WHERE date >= $1 AND date <= $2
+             AND is_personalized = true
+             AND requested_by = $3
+           ORDER BY date DESC""",
+        start, today, openid,
     )
 
     if not rows:
-        return _mock_daily_timeline(today, start)
+        return {
+            "period": f"{start.isoformat()} ~ {today.isoformat()}",
+            "daily_timeline": [],
+            "hot_tags": [],
+            "weekly_commentary": "还没有生成过专属简报，去首页输入兴趣试试吧 ✨",
+            "total_events": 0,
+            "generated_at": datetime.utcnow().isoformat() + "+00:00",
+        }
 
-    # 按日期分组：合并每天早报+晚报的 items
+    return await _build_timeline_from_rows(rows, start, today, interest_tags, openid)
+
+
+async def _build_timeline_from_rows(rows, start, today, interest_tags, openid=""):
+    """通用：从简报行构建时间线"""
+    interest_set = set(interest_tags) if interest_tags else set()
     daily_events = defaultdict(list)
     for r in rows:
         day = r["date"].isoformat()
@@ -105,10 +133,23 @@ async def _build_daily_timeline(start: date, today: date) -> dict:
             sections = json.loads(sections)
         if not isinstance(sections, list):
             continue
+        # 合并简报级兴趣标签
+        briefing_interest_tags = []
+        if r.get("is_personalized") and "interest_tags" in r:
+            bit = r["interest_tags"]
+            if isinstance(bit, str):
+                try: briefing_interest_tags = json.loads(bit)
+                except json.JSONDecodeError: pass
+            elif isinstance(bit, list):
+                briefing_interest_tags = bit
 
         for section in sections:
             for item in (section.get("items") or []):
                 if not item.get("title"):
+                    continue
+                item_tags = set(item.get("tags", []))
+                merged_tags = list(item_tags | set(briefing_interest_tags))
+                if interest_set and not (interest_set & set(merged_tags)):
                     continue
                 daily_events[day].append({
                     "title": item.get("title", ""),
@@ -116,58 +157,39 @@ async def _build_daily_timeline(start: date, today: date) -> dict:
                     "source": item.get("source", ""),
                     "url": item.get("url", ""),
                     "score": item.get("score", 0),
-                    "tags": item.get("tags", []),
+                    "tags": merged_tags,
                     "image_url": item.get("image_url", ""),
                 })
 
-    # 构建时间线：每天最多取 4 条头条
+    # 构建时间线（最多取4条/天）
     timeline = []
     all_tags = []
     for i in range(6, -1, -1):
         day = (start + timedelta(days=i)).isoformat()
         events = sorted(daily_events.get(day, []), key=lambda x: x["score"], reverse=True)[:4]
         if events:
-            for e in events:
-                all_tags.extend(e.get("tags", []))
+            for e in events: all_tags.extend(e.get("tags", []))
             d = date.fromisoformat(day)
             day_label = "今天" if d == today else "昨天" if d == today - timedelta(days=1) else _WEEKDAY_ZH[d.weekday()]
             date_display = f"{d.month}月{d.day}日"
             timeline.append({
-                "date": day,
-                "day_label": day_label,
-                "date_display": date_display,
+                "date": day, "day_label": day_label, "date_display": date_display,
                 "event_count": len(daily_events.get(day, [])),
-                "ai_summary": "",  # 先占位，下面填充
+                "ai_summary": _generate_day_summary(day, events),
                 "events": events,
             })
 
-    # 计算热门标签
+    # 热门标签（不过滤，展示所有用户关心过的领域）
     tag_counts = defaultdict(int)
-    for t in all_tags:
-        tag_counts[t] += 1
+    for t in all_tags: tag_counts[t] += 1
     hot_tags = sorted(
-        [{"tag": t, "label_zh": _TAG_LABELS.get(t, t), "count": c}
-         for t, c in tag_counts.items()],
+        [{"tag": t, "label_zh": _TAG_LABELS.get(t, t), "count": c} for t, c in tag_counts.items()],
         key=lambda x: x["count"], reverse=True,
-    )[:8]
+    )[:10]
 
-    # 为最近3天（timeline 按最新在前排序）生成 AI 点评（并行加速）
-    commentary_tasks = []
-    for i in range(min(3, len(timeline))):
-        day = timeline[i]
-        day_tags = list(set(t for e in day["events"] for t in e.get("tags", [])))
-        commentary_tasks.append(
-            _ai_commentary(day["day_label"], day["date_display"], day["events"], day_tags)
-        )
-    commentaries = await asyncio.gather(*commentary_tasks)
-    for i in range(min(3, len(timeline))):
-        day = timeline[i]
-        commentary = commentaries[i] if i < len(commentaries) else ""
-        day["ai_summary"] = commentary
-        logger.info("Commentary for %s: %s...", day["date_display"], commentary[:80] if commentary else "(empty)")
-
-    # 生成周综述
-    weekly_commentary = await _weekly_overview(timeline, hot_tags)
+    # AI 周综述（个性化时提用户兴趣）
+    interest_hint = f"用户关注领域：{'、'.join(interest_tags)}。" if interest_tags else ""
+    weekly_commentary = await _weekly_overview(timeline, hot_tags, interest_hint) if timeline else ""
 
     return {
         "period": f"{start.isoformat()} ~ {today.isoformat()}",
@@ -176,22 +198,54 @@ async def _build_daily_timeline(start: date, today: date) -> dict:
         "weekly_commentary": weekly_commentary,
         "total_events": sum(len(d.get("events", [])) for d in timeline),
         "generated_at": datetime.utcnow().isoformat() + "+00:00",
+        "is_personalized": True,
     }
 
 
+async def _build_daily_timeline(start: date, today: date, interest_tags: list[str] | None = None) -> dict:
+    """通用/标签过滤趋势：查非个性化简报。"""
+    if _db_pool is None:
+        return _mock_daily_timeline(today, start)
+
+    rows = await _db_pool.fetch(
+        """SELECT id, type, date, sections, is_personalized, interest_tags
+           FROM briefings
+           WHERE date >= $1 AND date <= $2 AND language = 'zh'""",
+        start, today,
+    )
+    if not rows:
+        return _mock_daily_timeline(today, start)
+
+    return await _build_timeline_from_rows(rows, start, today, interest_tags or [])
+
+
 def _generate_day_summary(day: str, events: list[dict]) -> str:
-    """基于当天头条生成简短摘要（规则引擎）"""
+    """基于当天头条生成简短摘要（规则引擎 — 有分析性）"""
     if not events:
         return ""
     top_tags = defaultdict(int)
     for e in events:
         for t in e.get("tags", []):
             top_tags[t] += 1
-    hot = [t for t, _ in sorted(top_tags.items(), key=lambda x: -x[1])[:3]]
+    hot = sorted(top_tags.items(), key=lambda x: -x[1])[:3]
     top = events[0]
     title = top.get("title", "")[:50]
-    tag_str = "、".join(hot) if hot else ""
-    return f"今日焦点：{title}" + (f"（热门标签：{tag_str}）" if tag_str else "")
+    tag_str = "、".join(t for t, _ in hot) if hot else ""
+    # 根据标签给出不同判断句式
+    tag_words = set(t for t, _ in hot)
+    if "LLM" in tag_words or "Agent" in tag_words:
+        insight = "大模型/智能体赛道持续活跃"
+    elif "芯片" in tag_words:
+        insight = "芯片/硬件竞争持续升温"
+    elif "融资" in tag_words:
+        insight = "资本市场对AI领域保持高度关注"
+    elif "安全" in tag_words:
+        insight = "AI安全与合规问题日益凸显"
+    elif "机器人" in tag_words:
+        insight = "具身智能/机器人领域有新突破"
+    else:
+        insight = "科技领域保持活跃态势"
+    return f"{insight}：{title}" + (f"（{tag_str}）" if tag_str else "")
 
 
 # DeepSeek API 配置（与 module-b 共用同一 API Key）
@@ -215,11 +269,11 @@ async def _ai_commentary(day_label: str, date_display: str, events: list[dict], 
                 json={
                     "model": "deepseek-chat",
                     "messages": [
-                        {"role": "system", "content": "你是AI/科技媒体主编。只点评AI、大模型、智能体、开源、芯片、机器人等科技领域。完全忽略体育、娱乐、社会新闻。用1-2句话洞察科技行业的真正信号，不是罗列新闻。"},
-                        {"role": "user", "content": f"{date_display}（{day_label}）科技事件：\n{titles}\n\n只选1-2条最值得关注的AI/科技事件点评（忽略体育和娱乐）："},
+                        {"role": "system", "content": "你是顶级科技媒体主编。用1-2句话分析今天的科技新闻揭示的行业信号。必须包含你的独立判断（如：趋势加速/战略转型/竞争升级/技术突破），而不是复述新闻标题。禁止说「今日焦点包括」这种总结。只点评AI/大模型/智能体/芯片/机器人/开源/自动驾驶。忽略体育和娱乐。"},
+                        {"role": "user", "content": f"{date_display}（{day_label}）科技事件：\n{titles}\n\n请给出你的专业分析（1-2句话，必须包含独立判断）："},
                     ],
                     "temperature": 0.7,
-                    "max_tokens": 100,
+                    "max_tokens": 120,
                 },
             )
             if resp.status_code == 200:
@@ -231,7 +285,7 @@ async def _ai_commentary(day_label: str, date_display: str, events: list[dict], 
     return _generate_day_summary("", events)
 
 
-async def _weekly_overview(timeline: list[dict], hot_tags: list[dict]) -> str:
+async def _weekly_overview(timeline: list[dict], hot_tags: list[dict], interest_hint: str = "") -> str:
     """生成一周趋势总评"""
     if not _DEEPSEEK_KEY or not timeline:
         return ""
@@ -242,6 +296,10 @@ async def _weekly_overview(timeline: list[dict], hot_tags: list[dict]) -> str:
     )
     tags_str = "、".join(f"{t['label_zh']}({t['count']})" for t in hot_tags[:5])
 
+    system_msg = "你是顶级媒体主编。用2-3句话分析本周最核心的变化趋势。必须有独立判断。"
+    if interest_hint:
+        system_msg += f" {interest_hint}只分析用户关注的领域，不要扯其他话题。"
+
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
@@ -250,8 +308,8 @@ async def _weekly_overview(timeline: list[dict], hot_tags: list[dict]) -> str:
                 json={
                     "model": "deepseek-chat",
                     "messages": [
-                        {"role": "system", "content": "你是AI/科技媒体主编。只分析AI、大模型、智能体、芯片、机器人等科技领域的趋势。完全忽略体育、娱乐、消费类新闻。"},
-                        {"role": "user", "content": f"本周AI/科技热点：{tags_str}\n近三天：\n{days_summary}\n\n用2-3句话总结本周AI/科技领域的核心变化："},
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": f"热点标签：{tags_str}\n近三天：\n{days_summary}\n\n给出2-3句话趋势判断（要有立场和洞察）："},
                     ],
                     "temperature": 0.7,
                     "max_tokens": 150,
@@ -384,9 +442,18 @@ def _mock_daily_timeline(today: date, start: date) -> dict:
         "period": f"{start.isoformat()} ~ {today.isoformat()}",
         "daily_timeline": timeline,
         "hot_tags": hot_tags,
+        "weekly_commentary": _MOCK_WEEKLY_COMMENTARY,
         "total_events": sum(len(d.get("events", [])) for d in timeline),
         "generated_at": datetime.utcnow().isoformat() + "+00:00",
     }
+
+
+_MOCK_WEEKLY_COMMENTARY = (
+    "本周AI领域持续活跃，大模型赛道竞争白热化。OpenAI、Google、Anthropic等巨头密集发布新版本，"
+    "多模态能力和长上下文成为核心竞争点。国内字节、百度等厂商加速追赶。"
+    "芯片硬件方面，英伟达发布全模态物理AI模型，国内壁仞科技完成大额融资。"
+    "AI安全与监管成为全球议题，欧盟AI法案正式生效。整体趋势：AI正从模型层向应用层快速渗透。"
+)
 
 
 # ── GET /api/trends/tag/{tag} ───────────────────────────────────────

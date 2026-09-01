@@ -9,7 +9,7 @@
 
 const ENV = "development"; // 'development' | 'production'
 
-const DEV_BASE_URL = "http://localhost:8003";
+const DEV_BASE_URL = "http://127.0.0.1:8003";
 const PROD_BASE_URL = "https://vcast.asia"; // 生产环境域名
 
 const baseUrl = ENV === "production" ? PROD_BASE_URL : DEV_BASE_URL;

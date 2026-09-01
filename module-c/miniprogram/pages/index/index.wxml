@@ -1,155 +1,89 @@
 <view class="container">
-  <!-- 早报/晚报 Tab -->
-  <view class="tab-bar">
-    <view
-      class="tab-item {{currentTab === 'morning' ? 'active' : ''}}"
-      data-type="morning"
-      bindtap="onTabTap"
-    >☀️ 早报</view>
-    <view
-      class="tab-item {{currentTab === 'evening' ? 'active' : ''}}"
-      data-type="evening"
-      bindtap="onTabTap"
-    >🌙 晚报</view>
-  </view>
 
-  <!-- 个性化兴趣输入面板 -->
-  <view class="interest-panel {{interestPanelExpanded ? 'expanded' : ''}}">
-    <view class="interest-toggle" bindtap="onToggleInterestPanel">
-      <text class="interest-toggle-text">
-        {{interestPanelExpanded ? '收起定制面板 ▴' : '✨ 定制你的专属简报 ▾'}}
-      </text>
-    </view>
-    <view class="interest-body" wx:if="{{interestPanelExpanded}}">
-      <textarea
-        class="interest-textarea"
-        placeholder="输入你感兴趣的新闻领域，如：AI编程工具、自动驾驶..."
-        value="{{interestText}}"
-        bindinput="onInterestInput"
-        maxlength="200"
-        auto-height
-      />
-      <view class="quick-tags-row" wx:if="{{quickTags.length > 0}}">
-        <text
-          wx:for="{{quickTags}}"
-          wx:key="tag"
-          class="quick-tag {{item.selected ? 'selected' : ''}}"
-          data-tag="{{item.tag}}"
-          bindtap="onQuickTagTap"
-        >{{item.label_zh}}</text>
-      </view>
-      <button
-        class="generate-btn"
-        bindtap="onGenerateBriefing"
-        disabled="{{generating || !interestText}}"
-      >{{generating ? '⏳ 生成中...' : '🔍 生成我的简报'}}</button>
-    </view>
-  </view>
+  <!-- ══════════════════════════════════════════
+       我的报道 — 早/晚自动切换
+       ══════════════════════════════════════════ -->
+  <view class="report-zone">
 
-  <!-- 生成状态蒙层 -->
-  <view class="generating-overlay" wx:if="{{generating}}">
-    <view class="generating-card">
-      <view class="generating-spinner"></view>
-      <text class="generating-text">正在为你精选新闻…</text>
-      <text class="generating-hint">预计需要 30-45 秒，请耐心等待</text>
-      <text class="generating-elapsed">{{pollCount * 2}} 秒</text>
-      <button class="cancel-btn" bindtap="onCancelGeneration">取消</button>
-    </view>
-  </view>
-
-  <!-- 个性化标记 -->
-  <view wx:if="{{isPersonalized && briefing}}" class="personalized-banner">
-    🔍 按你的兴趣生成：<text class="fw600">{{personalizedTags.join('、')}}</text>
-  </view>
-
-  <!-- 加载中 -->
-  <view wx:if="{{loading}}" class="loading">
-    <view class="loading-spinner"></view>
-    <text>加载最新简报中...</text>
-  </view>
-
-  <!-- 无数据 -->
-  <view wx:if="{{!briefing && !loading}}" class="empty-state">
-    <text class="empty-icon">📭</text>
-    <text>暂无{{currentTab === 'morning' ? '早报' : '晚报'}}</text>
-    <text class="empty-hint">下拉刷新试试</text>
-  </view>
-
-  <!-- 简报内容 -->
-  <view wx:if="{{briefing && !loading}}" class="briefing-content">
-
-    <!-- 日期 + 标签过滤提示 -->
-    <view class="date-row">
-      <text class="date-text">{{dateText}}</text>
-      <text class="item-count">{{totalItems}} 条精选</text>
-    </view>
-    <view wx:if="{{activeTags.length > 0}}" class="filter-banner">
-      🏷️ 已按兴趣过滤：<text class="fw600">{{activeTags.join('、')}}</text>
-    </view>
-
-    <!-- 🔥 头条卡片 -->
-    <view wx:if="{{briefing.headline && briefing.headline.title}}" class="headline-card" bindtap="onCardTap" data-id="{{briefing.id}}">
-      <view class="headline-badge">🔥 头条</view>
-      <view class="headline-title">{{briefing.headline.title}}</view>
-      <view class="headline-summary">{{briefing.headline.summary}}</view>
-      <view wx:if="{{headlineItem.tags && headlineItem.tags.length > 0}}" class="headline-tags">
-        <text wx:for="{{headlineItem.tags}}" wx:key="*this" class="htag">{{item}}</text>
-        <text wx:if="{{headlineItem.score}}" class="htag score">{{headlineItem.score}}分</text>
-      </view>
-    </view>
-
-    <!-- 📰 分类区块 -->
-    <view wx:for="{{briefing.sections}}" wx:for-index="si" wx:key="section_title" class="section-card">
-      <view class="section-card-header" bindtap="onSectionToggle" data-index="{{si}}">
-        <view class="section-card-title">
-          <text class="section-num">{{si + 1}}</text>
-          <text>{{item.section_title}}</text>
+    <!-- 头部 -->
+    <view class="report-hd">
+      <view class="report-header-row">
+        <view class="report-title-row">
+          <text class="report-emoji">{{typeEmoji}}</text>
+          <text class="report-title">{{typeLabel}}</text>
         </view>
-        <view class="section-card-meta">
-          <text class="section-count">{{item.items.length}}篇</text>
-          <text class="section-arrow {{sectionsExpanded[si] ? 'rotated' : ''}}">▾</text>
+        <text class="report-time" wx:if="{{timeText}}">{{timeText}}</text>
+      </view>
+    </view>
+
+    <!-- 加载中 -->
+    <view wx:if="{{loading}}" class="load-row">加载中...</view>
+
+    <!-- 空状态 -->
+    <view wx:if="{{!loading && !briefing}}" class="empty-prompt">
+      <text class="empty-icon">📭</text>
+      <text class="empty-msg">还没有{{typeLabel}}</text>
+      <text class="empty-hint">去「专属简报」生成你的第一篇报道吧 ✨</text>
+    </view>
+
+    <!-- 报道内容 -->
+    <view wx:if="{{briefing && !loading}}" class="report-card">
+      <!-- 头条 -->
+      <view wx:if="{{briefing.headline && briefing.headline.title}}" class="rp-headline" bindtap="onCardTap">
+        <image wx:if="{{headlineItem.image_url && !headlineItem._headImgHide}}" src="{{headlineItem.image_url}}" mode="aspectFill" class="rp-hl-img" binderror="onHeadImageError" />
+        <view class="rp-hl-overlay">
+          <text class="rp-hl-badge">🔥 头条</text>
+          <text class="rp-hl-title">{{briefing.headline.title}}</text>
+          <text class="rp-hl-summary">{{briefing.headline.summary}}</text>
         </view>
       </view>
 
-      <!-- 展开后的条目列表 -->
-      <view wx:if="{{sectionsExpanded[si]}}" class="section-items">
-        <view wx:for="{{item.items}}" wx:for-item="article" wx:for-index="ai" class="article-mini" bindtap="onArticleTap" data-section="{{si}}" data-index="{{ai}}">
-          <image wx:if="{{article.image_url && !article._imgHide}}" src="{{article.image_url}}" mode="widthFix" class="article-thumb" lazy-load binderror="onMiniImageError" data-section="{{si}}" data-index="{{ai}}" />
-          <view class="article-body">
-            <view class="article-title">{{article.title}}</view>
-            <view class="article-summary">{{article.summary}}</view>
-            <view class="article-meta-row">
-              <text class="am-source">{{article.source}}</text>
-              <text wx:for="{{article.tags}}" wx:for-item="t" wx:key="*this" class="am-tag">{{t}}</text>
-              <text class="am-score">⭐{{article.score}}</text>
+      <!-- TL;DR -->
+      <view wx:if="{{briefing.tl_dr && briefing.tl_dr.length > 0}}" class="rp-tldr">
+        <text class="rp-tldr-title">📋 今日要点</text>
+        <view wx:for="{{briefing.tl_dr}}" wx:key="*this" class="rp-tldr-item">
+          <text class="rp-dot">{{index + 1}}</text>
+          <text>{{item}}</text>
+        </view>
+      </view>
+
+      <!-- 兴趣标签 -->
+      <view wx:if="{{briefing.interest_tags && briefing.interest_tags.length > 0}}" class="rp-tags">
+        <text wx:for="{{briefing.interest_tags}}" wx:key="*this" class="rp-tag">{{item}}</text>
+      </view>
+
+      <!-- Sections -->
+      <view wx:for="{{briefing.sections}}" wx:key="section_title" wx:for-index="si" class="rp-section">
+        <view class="rp-sec-hd" bindtap="onSectionToggle" data-index="{{si}}">
+          <text class="rp-sec-title">{{item.section_title}}</text>
+          <text class="rp-sec-count">{{item.items.length}}篇 {{sectionsExpanded[si] ? '▾' : '▸'}}</text>
+        </view>
+        <view wx:if="{{sectionsExpanded[si]}}" class="rp-sec-items">
+          <view wx:for="{{item.items}}" wx:for-item="art" class="rp-art" bindtap="onArticleTap">
+            <image wx:if="{{art.image_url && !art._imgHide}}" src="{{art.image_url}}" mode="widthFix" class="rp-art-img" lazy-load binderror="onMiniImageError" data-section="{{si}}" data-index="{{index}}" />
+            <view class="rp-art-body">
+              <text class="rp-art-title">{{art.title}}</text>
+              <text class="rp-art-sum">{{art.summary}}</text>
+              <view class="rp-art-meta">
+                <text class="rp-art-src">{{art.source}}</text>
+                <text wx:for="{{art.tags}}" wx:key="*this" wx:for-item="t" class="rp-art-tag">{{t}}</text>
+                <text class="rp-art-score" wx:if="{{art.score}}">⭐{{art.score}}</text>
+              </view>
             </view>
-            <!-- Phase 3: 辩论标记 -->
-            <view wx:if="{{article.debate}}" class="debate-badge-mini">🎭 AI三方观点</view>
           </view>
         </view>
       </view>
-    </view>
 
-    <!-- 💡 关键趋势信号 -->
-    <view wx:if="{{briefing.key_takeaways && briefing.key_takeaways.length > 0}}" class="takeaways-card">
-      <view class="takeaways-header">💡 趋势信号</view>
-      <view wx:for="{{briefing.key_takeaways}}" wx:key="*this" class="takeaway-row">
-        <text class="takeaway-dot">{{index + 1}}</text>
-        <text>{{item}}</text>
+      <!-- 趋势信号 -->
+      <view wx:if="{{briefing.key_takeaways && briefing.key_takeaways.length > 0}}" class="rp-takeaways">
+        <text class="rp-tldr-title">💡 趋势信号</text>
+        <view wx:for="{{briefing.key_takeaways}}" wx:key="*this" class="rp-tldr-item">
+          <text class="rp-dot">{{index + 1}}</text>
+          <text>{{item}}</text>
+        </view>
       </view>
     </view>
 
-    <!-- 底部：查看完整简报 -->
-    <view class="bottom-actions">
-      <button class="btn-full" bindtap="onCardTap" data-id="{{briefing.id}}">📋 查看完整简报</button>
-    </view>
-
-    <!-- 统计信息 -->
-    <view class="stats-row">
-      <text class="stat-item">📊 原始抓取 {{stats.fetched}}条</text>
-      <text class="stat-item">✅ 评分通过 {{stats.passed}}条</text>
-      <text class="stat-item">🎯 最终精选 {{stats.final_count}}条</text>
-      <text wx:if="{{stats.headline_title}}" class="stat-item stat-headline">🔥 头条: {{stats.headline_title}}</text>
-    </view>
   </view>
+
 </view>

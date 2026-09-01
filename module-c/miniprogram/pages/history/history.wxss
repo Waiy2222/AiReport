@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════
-   历史页 — 简报列表 v2.0
+   历史页 — 简报列表 v2.1
    ══════════════════════════════════════════ */
 
 page {
@@ -24,21 +24,21 @@ page {
   background: var(--bg-card);
   border-radius: 48rpx;
   padding: 0 28rpx;
-  height: 88rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+  height: 92rpx;
+  box-shadow: var(--shadow-xs);
   border: 2rpx solid transparent;
   transition: all 0.3s var(--ease-out);
 }
 
 .search-box:focus-within {
   border-color: var(--primary);
-  box-shadow: 0 0 0 4rpx rgba(74, 108, 247, 0.08), 0 4rpx 16rpx rgba(0,0,0,0.06);
+  box-shadow: 0 0 0 6rpx rgba(74, 108, 247, 0.08), 0 4rpx 20rpx rgba(0,0,0,0.06);
 }
 
 .search-icon {
   font-size: 32rpx;
   margin-right: 14rpx;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .search-input {
@@ -54,13 +54,12 @@ page {
 .search-clear {
   font-size: 28rpx;
   color: var(--text-tertiary);
-  padding: 12rpx;
+  padding: 14rpx;
   border-radius: 50%;
   transition: all 0.15s;
 }
-
 .search-clear:active {
-  background: var(--bg-page);
+  background: #fee2e2;
   color: var(--accent-red);
 }
 
@@ -88,7 +87,7 @@ page {
 
 .filter-chip {
   font-size: 24rpx;
-  padding: 10rpx 22rpx;
+  padding: 12rpx 24rpx;
   border-radius: var(--radius-full);
   background: var(--bg-card);
   color: var(--text-secondary);
@@ -107,27 +106,45 @@ page {
   color: var(--primary);
   border-color: var(--primary);
   font-weight: 700;
+  box-shadow: 0 2rpx 8rpx rgba(74,108,247,0.1);
 }
 
-/* 标签行 — flex-wrap 替代 scroll-view，避免 tap 事件被吞 */
+/* 主切换按钮 */
+.main-toggle { gap: 12rpx; margin-bottom: 20rpx; }
+.main-chip {
+  flex: 1; text-align: center; font-size: 28rpx; padding: 16rpx 20rpx;
+  border-radius: 14rpx; font-weight: 600;
+}
+.main-chip.active {
+  background: linear-gradient(135deg, var(--primary-indigo), var(--primary-purple));
+  color: #fff; border-color: transparent;
+  box-shadow: 0 4rpx 16rpx rgba(99,102,241,0.25);
+}
+
+/* 标签行 — 水平滚动避免溢出 */
+.tag-row-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
 .tag-row-wrap {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10rpx;
-  flex-wrap: wrap;
+  padding: 4rpx 0;
 }
 
 .tag-chip {
   font-size: 22rpx;
-  padding: 8rpx 18rpx;
+  padding: 10rpx 20rpx;
 }
 
 /* 清除筛选 */
 .clear-filters {
   text-align: right;
   font-size: 22rpx;
-  color: var(--accent-red, #ef4444);
-  padding: 6rpx 4rpx;
+  color: var(--accent-red);
+  padding: 8rpx 4rpx 4rpx;
+  font-weight: 500;
 }
 
 /* ══════════════════════════════════════════
@@ -148,20 +165,28 @@ page {
   box-shadow: var(--shadow-xs);
   border: 1rpx solid var(--border-lighter);
   transition: transform 0.2s var(--ease-out);
+  position: relative; overflow: hidden;
 }
 
 .hstat-item:active {
   transform: scale(0.97);
 }
 
+.hstat-item::before {
+  content: ''; position: absolute; top: -16rpx; right: -16rpx;
+  width: 64rpx; height: 64rpx; border-radius: 50%;
+  background: var(--primary-light); opacity: 0.35;
+}
+
 .hstat-num {
   display: block;
   font-size: 44rpx;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  background: linear-gradient(135deg, var(--primary), var(--primary-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  position: relative; z-index: 1;
 }
 
 .hstat-label {
@@ -169,6 +194,7 @@ page {
   color: var(--text-tertiary);
   margin-top: 6rpx;
   font-weight: 500;
+  position: relative; z-index: 1;
 }
 
 /* ── 搜索结果提示 ── */
@@ -249,7 +275,7 @@ page {
 /* ── TL;DR 要点预览 ── */
 .hcard-points {
   margin-bottom: 16rpx;
-  padding: 16rpx 18rpx;
+  padding: 18rpx 20rpx;
   background: var(--bg-page);
   border-radius: var(--radius-md);
 }
@@ -287,7 +313,7 @@ page {
 
 .hcard-tag {
   font-size: 20rpx;
-  padding: 4rpx 14rpx;
+  padding: 6rpx 16rpx;
   border-radius: var(--radius-full);
   background: linear-gradient(135deg, rgba(74, 108, 247, 0.08), rgba(99, 102, 241, 0.06));
   color: var(--primary);
@@ -295,12 +321,27 @@ page {
   font-weight: 500;
 }
 
+/* ── 个性化卡片标记 ── */
+.personalized-card-tag {
+  font-size: 22rpx;
+  color: var(--primary-indigo);
+  background: linear-gradient(135deg, #f0f4ff, #eef2ff);
+  border-radius: 10rpx;
+  padding: 10rpx 18rpx;
+  margin-bottom: 14rpx;
+  border-left: 4rpx solid var(--primary-indigo);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
 /* ── 卡片底部 ── */
 .hcard-bottom {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 12rpx;
+  padding-top: 14rpx;
   border-top: 1rpx solid var(--border-lighter);
 }
 
@@ -319,6 +360,19 @@ page {
 }
 
 /* ══════════════════════════════════════════
+   加载
+   ══════════════════════════════════════════ */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60rpx 40rpx;
+  color: var(--text-tertiary);
+  font-size: 26rpx;
+}
+
+/* ══════════════════════════════════════════
    空状态
    ══════════════════════════════════════════ */
 .empty-state {
@@ -326,22 +380,24 @@ page {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80rpx 40rpx;
+  padding: 100rpx 40rpx;
   color: var(--text-tertiary);
   font-size: 28rpx;
 }
 
 .empty-icon {
-  font-size: 72rpx;
+  font-size: 80rpx;
   margin-bottom: 20rpx;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .empty-hint {
-  margin-top: 20rpx;
+  margin-top: 24rpx;
   color: var(--primary);
   font-size: 26rpx;
-  padding: 8rpx 20rpx;
+  padding: 10rpx 24rpx;
+  background: var(--primary-light);
+  border-radius: var(--radius-full);
 }
 
 /* ── 搜索无结果建议 ── */
@@ -352,17 +408,6 @@ page {
   font-size: 24rpx; color: var(--primary); background: var(--primary-light);
   border-radius: var(--radius-full); padding: 10rpx 24rpx;
   border: 1rpx solid rgba(74,108,247,0.15);
-}
-
-/* ── 个性化卡片标记 ── */
-.personalized-card-tag {
-  font-size: 22rpx;
-  color: #667eea;
-  background: #f0f4ff;
-  border-radius: 8rpx;
-  padding: 8rpx 16rpx;
-  margin-bottom: 12rpx;
-  border-left: 4rpx solid #667eea;
 }
 
 .filter-label {

@@ -86,15 +86,19 @@ async def fetch_github(since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:
     return to_raw_items(unique, batch_id)
 
 
+_EPOCH_GH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
 def _parse_github_time(time_str: str) -> datetime:
-    """解析 GitHub 时间格式到 UTC datetime"""
+    """解析 GitHub 时间格式到 UTC datetime。解析失败返回 epoch（非 now()），
+    确保无时间戳的旧条目被 since 过滤拦截。"""
     if not time_str:
-        return datetime.now(timezone.utc)
+        return _EPOCH_GH
     try:
         dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
         return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
-        return datetime.now(timezone.utc)
+        return _EPOCH_GH
 
 
 async def fetch(pool, since: datetime, batch_id: uuid_lib.UUID) -> list[dict]:

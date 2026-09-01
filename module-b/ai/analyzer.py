@@ -15,20 +15,20 @@ _ALLOWED_TAGS = {
 
 # 关键词→标签映射（兜底：当 LLM 返回的标签全部不合法时使用）
 _KEYWORD_TAG_MAP = [
-    (re.compile(r"LLM|大模型|GPT|Claude|Gemini|模型", re.I), "LLM"),
-    (re.compile(r"agent|智能体|代理", re.I), "Agent"),
-    (re.compile(r"开源|open.source|github", re.I), "开源"),
-    (re.compile(r"工具|tool|插件|plugin|sdk", re.I), "工具"),
-    (re.compile(r"芯片|chip|nvidia|intel|amd|半导体", re.I), "芯片"),
-    (re.compile(r"机器人|robot|automation", re.I), "机器人"),
-    (re.compile(r"自动驾驶|self.driv|autonomous", re.I), "自动驾驶"),
-    (re.compile(r"融资|IPO|上市|投资|估值|b轮|a轮", re.I), "融资"),
-    (re.compile(r"体育|sport|nba|nfl|nhl|足球|篮球|比赛|赛事|冠军", re.I), "体育"),
-    (re.compile(r"安全|security|漏洞|攻击|黑客|隐私", re.I), "安全"),
-    (re.compile(r"医疗|医学|health|药物|临床", re.I), "医疗"),
-    (re.compile(r"国际|外交|贸易|制裁|关税", re.I), "全球"),
-    (re.compile(r"政策|监管|法规|政府|法院|法案", re.I), "行业"),
-    (re.compile(r"科技|tech|AI|人工智能|发布|推出|发布", re.I), "科技"),
+    (re.compile(r"LLM|大模型|GPT|Claude|Gemini|transformer|语言模型", re.I), "LLM"),
+    (re.compile(r"agent|智能体|代理|AI代理", re.I), "Agent"),
+    (re.compile(r"开源|open.source|github|repo\b|gitlab|Apache", re.I), "开源"),
+    (re.compile(r"tool|插件|plugin|sdk|cli\b|api\b|框架|开发者工具|IDE", re.I), "工具"),
+    (re.compile(r"芯片|chip|nvidia|intel|amd|半导体|gpu|cpu|处理器|显卡", re.I), "芯片"),
+    (re.compile(r"机器人|robot|automation|人形|机械臂|具身智能", re.I), "机器人"),
+    (re.compile(r"自动驾驶|self.driv|autonomous|无人驾驶|无人车", re.I), "自动驾驶"),
+    (re.compile(r"融资|IPO|上市|投资|估值|b轮|a轮|参投|创投|亿元|万美元", re.I), "融资"),
+    (re.compile(r"体育|sport|nba|nfl|nhl|足球|篮球|比赛|赛事|冠军|WNBA|UFC", re.I), "体育"),
+    (re.compile(r"安全|security|漏洞|攻击|黑客|隐私|泄露|虚假广告|起诉", re.I), "安全"),
+    (re.compile(r"医疗|医学|health|药物|临床|制药", re.I), "医疗"),
+    (re.compile(r"国际|外交|贸易|制裁|关税|白宫|美国|欧洲", re.I), "全球"),
+    (re.compile(r"政策|监管|法规|政府|法院|法案|条例|合规|审查", re.I), "行业"),
+    (re.compile(r"AI|人工智能|科技|tech\b|大疆|百度|阿里|腾讯|字节|OpenAI|Anthropic", re.I), "科技"),
 ]
 
 
@@ -80,12 +80,6 @@ async def batch_score(items: list[dict], batch_size: int = 15) -> list[dict]:
                 item["score_reason"] = s.get("reason", "")
                 item["tags"] = _clean_tags(raw_tags, item.get("title", ""), item.get("content", ""))
                 scored_items.append(item)
-            # DEBUG: confirm this code path was reached
-            try:
-                with open("C:/Users/32089/AppData/Local/Temp/analyzer_debug.txt", "a", encoding="utf-8") as f:
-                    f.write(f"batch_score V2 called: {len(batch)} items, first tags={scored_items[-1].get('tags',[])}\n")
-            except:
-                pass
         except Exception as e:
             logger.error("Batch score API call failed: %s", str(e)[:80])
             for item in batch:

@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from db import get_pool, init_db, close_db
 from pipeline import run_pipeline
+from personalized_pipeline import run_personalized_pipeline
 from ai.render_longimage import render_longimage, _render_html
 
 def _get_pool_or_503():
@@ -46,6 +47,18 @@ class ProcessRequest(BaseModel):
     tags: list[str] | None = None  # 可选：按标签过滤
 
 
+class PersonalizedProcessRequest(BaseModel):
+    type: str  # morning / evening
+    date: str  # YYYY-MM-DD
+    batch_id: str
+    tags: list[str] | None = None
+    openid: str
+    interest_text: str = ""
+    interest_tags: list[str] = []
+    search_keywords: list[str] | None = None
+    items: list[dict]  # 已抓取的 raw_items（由调用方传入）
+
+
 @app.get("/health")
 async def health():
     try:
@@ -66,6 +79,32 @@ async def run_b(req: ProcessRequest):
 
     pool = _get_pool_or_503()
     result = await run_pipeline(pool, req.type, briefing_date, batch_id, filter_tags=req.tags)
+
+    return {
+        "status": "ok",
+        "briefing_id": str(result["briefing_id"]),
+        "stats": result["stats"],
+    }
+
+
+@app.post("/run-personalized")
+async def run_personalized(req: PersonalizedProcessRequest):
+    """个性化简报 AI 加工端点 — 轻量流水线（跳过辩论/补充）"""
+    if req.type not in ("morning", "evening"):
+        raise HTTPException(400, "type must be morning or evening")
+
+    pool = _get_pool_or_503()
+    result = await run_personalized_pipeline(
+        pool=pool,
+        briefing_type=req.type,
+        briefing_date=req.date,
+        filter_tags=req.tags or [],
+        openid=req.openid,
+        interest_text=req.interest_text,
+        interest_tags=req.interest_tags,
+        passed_items=req.items,
+        search_keywords=req.search_keywords,
+    )
 
     return {
         "status": "ok",

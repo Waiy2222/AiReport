@@ -1,0 +1,128 @@
+<view class="container">
+
+  <!-- ══════════════════════════════════════════
+       🎯 专属简报 — 你的私人定制区域
+       ══════════════════════════════════════════ -->
+  <view class="personal-zone">
+
+    <!-- 显示已生成的专属简报 -->
+    <view wx:if="{{isPersonalized && briefing}}" class="pz-result">
+      <view class="pz-result-hd">
+        <text class="pz-badge">✨ 你的专属简报</text>
+        <view class="pz-tags">
+          <text wx:for="{{personalizedTags}}" wx:key="*this" class="pz-t">{{item}}</text>
+        </view>
+      </view>
+
+      <!-- 头条 -->
+      <view wx:if="{{briefing.headline && briefing.headline.title}}" class="pz-headline" bindtap="onCardTap">
+        <image wx:if="{{headlineItem.image_url && !headlineItem._headImgHide}}" src="{{headlineItem.image_url}}" mode="aspectFill" class="pz-hl-img" binderror="onHeadImageError" />
+        <view class="pz-hl-overlay">
+          <text class="pz-hl-badge">🔥 头条</text>
+          <text class="pz-hl-title">{{briefing.headline.title}}</text>
+          <text class="pz-hl-summary">{{briefing.headline.summary}}</text>
+        </view>
+      </view>
+
+      <!-- TL;DR -->
+      <view wx:if="{{briefing.tl_dr && briefing.tl_dr.length > 0}}" class="pz-tldr">
+        <text class="pz-sec-title">📋 为你总结</text>
+        <view wx:for="{{briefing.tl_dr}}" wx:key="*this" class="pz-tldr-item">
+          <text class="pz-dot">{{index + 1}}</text>
+          <text>{{item}}</text>
+        </view>
+      </view>
+
+      <!-- Sections -->
+      <view wx:for="{{briefing.sections}}" wx:key="section_title" wx:for-index="si" class="pz-section">
+        <view class="pz-sec-hd" bindtap="onSectionToggle" data-index="{{si}}">
+          <text class="pz-sec-title">{{item.section_title}}</text>
+          <text class="pz-sec-count">{{item.items.length}}篇 {{sectionsExpanded[si] ? '▾' : '▸'}}</text>
+        </view>
+        <view wx:if="{{sectionsExpanded[si]}}" class="pz-sec-items">
+          <view wx:for="{{item.items}}" wx:for-item="art" class="pz-art" bindtap="onArticleTap">
+            <image wx:if="{{art.image_url && !art._imgHide}}" src="{{art.image_url}}" mode="widthFix" class="pz-art-img" lazy-load binderror="onMiniImageError" data-section="{{si}}" data-index="{{index}}" />
+            <view class="pz-art-body">
+              <text class="pz-art-title">{{art.title}}</text>
+              <text class="pz-art-sum">{{art.summary}}</text>
+              <view class="pz-art-meta">
+                <text class="pz-art-src">{{art.source}}</text>
+                <text wx:for="{{art.tags}}" wx:key="*this" wx:for-item="t" class="pz-art-tag">{{t}}</text>
+                <text class="pz-art-score" wx:if="{{art.score}}">⭐{{art.score}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 趋势信号 -->
+      <view wx:if="{{briefing.key_takeaways && briefing.key_takeaways.length > 0}}" class="pz-takeaways">
+        <text class="pz-sec-title">💡 趋势信号</text>
+        <view wx:for="{{briefing.key_takeaways}}" wx:key="*this" class="pz-tldr-item">
+          <text class="pz-dot">{{index + 1}}</text>
+          <text>{{item}}</text>
+        </view>
+      </view>
+
+      <button class="pz-new-btn" bindtap="onNewPersonalized">🔄 生成新的专属简报</button>
+    </view>
+
+    <!-- 输入面板 — 全屏布局 -->
+    <view wx:if="{{!isPersonalized || !briefing}}" class="pz-input">
+      <!-- 装饰头部 -->
+      <view class="pz-hero">
+        <view class="pz-hero-icon">✨</view>
+        <text class="pz-hero-title">你的专属简报</text>
+        <text class="pz-hero-sub">告诉AI你关注什么，为你量身定制</text>
+      </view>
+
+      <!-- 主体输入区 -->
+      <view class="pz-form">
+        <!-- 活标签 -->
+        <view wx:if="{{liveTags.length > 0}}" class="live-tags-row">
+          <text class="live-tags-hint">最近关注：</text>
+          <text wx:for="{{liveTags}}" wx:key="*this" class="live-tag" bindtap="onRemoveLiveTag" data-tag="{{item}}">{{item}} ✕</text>
+        </view>
+
+        <!-- 输入框 -->
+        <view class="pz-textarea-wrap">
+          <textarea class="pz-textarea" placeholder="输入你感兴趣的领域，如：电子竞技、医疗AI、芯片、自动驾驶..."
+            value="{{interestText}}" bindinput="onInterestInput" maxlength="200" auto-height />
+          <view class="pz-char-count">{{interestText.length}}/200</view>
+        </view>
+
+        <!-- 快速标签 -->
+        <view class="pz-quick-tags" wx:if="{{quickTags.length > 0}}">
+          <text class="pz-qt-label">💡 试试这些话题：</text>
+          <view class="pz-qt-row">
+            <text wx:for="{{quickTags}}" wx:key="tag" class="pz-qt {{item.selected ? 'on' : ''}}"
+              data-tag="{{item.tag}}" bindtap="onQuickTagTap">{{item.label_zh}}</text>
+          </view>
+        </view>
+
+        <!-- 生成按钮 -->
+        <button class="pz-gen-btn" bindtap="onGenerateBriefing" disabled="{{generating || !interestText}}">
+          {{generating ? '⏳ 生成中...' : '🚀 立即生成专属简报'}}
+        </button>
+      </view>
+
+      <!-- 底部提示 -->
+      <view class="pz-footer-hint">
+        <text>🔍 AI 将为你从全网精选最相关的资讯</text>
+        <text>⚡ 通常只需 30-60 秒</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 生成蒙层 -->
+  <view class="gen-overlay" wx:if="{{generating}}">
+    <view class="gen-card">
+      <view class="gen-spinner"></view>
+      <text class="gen-text">{{pollCount < 10 ? '🔍 抓取新闻...' : (pollCount < 20 ? '🧠 AI分析...' : '✨ 生成中...')}}</text>
+      <view class="gen-bar"><view class="gen-fill" style="width:{{genProgress}}%"></view></view>
+      <text class="gen-time">⏱ {{pollCount * 2}}s</text>
+      <button class="gen-cancel" bindtap="onCancelGeneration">取消</button>
+    </view>
+  </view>
+
+</view>

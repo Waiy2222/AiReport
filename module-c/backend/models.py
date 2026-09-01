@@ -39,6 +39,10 @@ class UnsubscribeRequest(BaseModel):
     openid: str
 
 
+class WechatLoginRequest(BaseModel):
+    js_code: str = Field(min_length=1, description="wx.login() 返回的临时 code")
+
+
 class PushRequest(BaseModel):
     briefing_id: str | None = None
     type: str | None = None  # morning / evening，不传 briefing_id 时取最新
@@ -140,3 +144,34 @@ class MyBriefingsResponse(BaseModel):
     size: int
     total: int
     items: list[MyBriefingItem]
+
+
+# ── 视频生成模型 ──────────────────────────────────────────────────
+
+
+class VideoGenerateRequest(BaseModel):
+    keyword: str = Field(min_length=1, max_length=200, description="视频主题关键词")
+    openid: str = "anonymous"
+
+
+class VideoGenerateResponse(BaseModel):
+    video_id: str
+    status: str = "processing"
+    message: str = ""
+
+
+class VideoStatusResponse(BaseModel):
+    video_id: str
+    status: str
+    title: str | None = None
+    output_path: str | None = None
+    cover_path: str | None = None
+    duration_seconds: int | None = None
+    error_msg: str | None = None
+
+
+class VideoListResponse(BaseModel):
+    items: list[dict] = Field(default_factory=list)
+    total: int = 0
+    page: int = 1
+    size: int = 10

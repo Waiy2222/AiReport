@@ -2,106 +2,94 @@
   <!-- 加载中 -->
   <view wx:if="{{loading}}" class="loading">
     <view class="loading-spinner"></view>
-    <text class="loading-text">正在分析事件趋势...</text>
+    <text class="loading-text">正在分析你的专属趋势...</text>
   </view>
 
-  <!-- 错误 -->
-  <view wx:elif="{{error}}" class="empty-state" bindtap="fetchTrends">
-    <text class="empty-icon">⚠️</text>
-    <text class="empty-text">加载失败，点击重试</text>
+  <!-- 无数据 -->
+  <view wx:elif="{{!loading && timeline.length === 0}}" class="empty-state">
+    <text class="empty-icon">📭</text>
+    <text class="empty-title">还没有专属趋势</text>
+    <text class="empty-desc">去首页生成你的专属简报，AI 会为你追踪趋势</text>
+    <button class="empty-btn" bindtap="onGoGenerate">✨ 去生成</button>
   </view>
 
   <!-- 趋势数据 -->
-  <view wx:else class="trends-content">
+  <view wx:else class="dashboard">
 
-    <!-- 统计概览 -->
-    <view class="trend-stats-row">
-      <view class="tstat-card">
-        <text class="tstat-value">{{timeline.length}}</text>
-        <text class="tstat-label">覆盖天数</text>
-      </view>
-      <view class="tstat-card">
-        <text class="tstat-value">{{totalEvents}}</text>
-        <text class="tstat-label">精选事件</text>
-      </view>
-      <view class="tstat-card">
-        <text class="tstat-value">{{hotTags.length}}</text>
-        <text class="tstat-label">热门标签</text>
-      </view>
-      <view class="tstat-card">
-        <text class="tstat-value">📰</text>
-        <text class="tstat-label">{{period}}</text>
+    <!-- 🎯 兴趣标签 -->
+    <view wx:if="{{personalizedTags.length > 0}}" class="interest-hero">
+      <text class="ih-icon">🎯</text>
+      <view class="ih-body">
+        <text class="ih-title">你的专属趋势</text>
+        <view class="ih-tags">
+          <text wx:for="{{personalizedTags}}" wx:key="*this" class="ih-tag">{{item}}</text>
+        </view>
       </view>
     </view>
 
-    <!-- 🔥 热门标签 -->
-    <view class="hot-tags-bar" wx:if="{{hotTags.length}}">
-      <text class="hot-tags-label">🔥 本周热词：</text>
-      <scroll-view scroll-x class="hot-tags-scroll">
-        <text wx:for="{{hotTags}}" wx:key="tag" class="hot-tag-chip" bindtap="onTagTap" data-tag="{{item.tag}}">
-          {{item.label_zh || item.tag}} {{item.count}}
-        </text>
-      </scroll-view>
-    </view>
-
-    <!-- 🤖 AI 周趋势分析 -->
-    <view class="weekly-card" wx:if="{{weeklyCommentary}}">
-      <view class="weekly-header">
-        <text class="weekly-icon">🤖</text>
-        <text class="weekly-title">AI 周趋势洞察</text>
+    <!-- 📊 数据概览 -->
+    <view class="stats-row">
+      <view class="stat">
+        <text class="stat-num">{{totalEvents}}</text>
+        <text class="stat-label">追踪事件</text>
       </view>
-      <text class="weekly-text">{{weeklyCommentary}}</text>
+      <view class="stat">
+        <text class="stat-num">{{timeline.length}}</text>
+        <text class="stat-label">活跃天数</text>
+      </view>
+      <view class="stat">
+        <text class="stat-num">{{hotTags.length}}</text>
+        <text class="stat-label">关注标签</text>
+      </view>
     </view>
 
-    <!-- 📅 每日事件时间线 -->
+    <!-- 🧠 AI 趋势判断 -->
+    <view wx:if="{{weeklyCommentary}}" class="insight-card">
+      <view class="insight-header">
+        <text class="insight-icon">🧠</text>
+        <text class="insight-label">AI 趋势判断</text>
+      </view>
+      <text class="insight-text">{{weeklyCommentary}}</text>
+    </view>
+
+    <!-- 📡 关注领域热度 -->
+    <view class="section-title">📡 关注领域</view>
+    <view class="radar-list" wx:if="{{hotTags.length}}">
+      <view wx:for="{{hotTags}}" wx:key="tag" class="radar-item">
+        <text class="radar-name">{{item.label_zh || item.tag}}</text>
+        <view class="radar-bar">
+          <view class="radar-fill" style="width: {{item.count * 10 > 100 ? 100 : item.count * 10}}%"></view>
+        </view>
+        <text class="radar-count">{{item.count}}</text>
+      </view>
+    </view>
+
+    <!-- 📅 时间线 -->
+    <view class="section-title">📅 每日回顾</view>
     <view class="timeline">
-      <view wx:for="{{timeline}}" wx:key="date" class="day-card">
-        <!-- 日期头部 -->
-        <view class="day-header" bindtap="onDayToggle" data-date="{{item.date}}">
-          <view class="day-header-left">
-            <view class="day-dot {{item.day_label === '今天' ? 'dot-today' : ''}}"></view>
-            <view class="day-info">
-              <text class="day-label">{{item.day_label}}</text>
-              <text class="day-date">{{item.date_display}}</text>
+      <view wx:for="{{timeline}}" wx:key="date" class="tl-day" bindtap="onDayToggle" data-date="{{item.date}}">
+        <view class="tl-dot-wrap">
+          <view class="tl-dot {{item.day_label === '今天' ? 'today' : ''}}"></view>
+          <view wx:if="{{index < timeline.length - 1}}" class="tl-line"></view>
+        </view>
+        <view class="tl-card">
+          <view class="tl-date-row">
+            <text class="tl-day-label">{{item.day_label}}</text>
+            <text class="tl-date">{{item.date_display}}</text>
+            <text class="tl-badge">{{item.event_count}}条</text>
+          </view>
+          <view wx:if="{{expandedDays[item.date]}}" class="tl-events">
+            <view wx:for="{{item.events}}" wx:for-item="ev" wx:key="title" class="tl-event">
+              <text class="tl-event-title">{{ev.title}}</text>
+              <text class="tl-event-summary">{{ev.summary}}</text>
             </view>
           </view>
-          <view class="day-header-right">
-            <text class="day-count">{{item.event_count}} 件事</text>
-            <text class="day-arrow">{{expandedDays[item.date] ? '▼' : '▶'}}</text>
-          </view>
-        </view>
-
-        <!-- AI 日摘要 -->
-        <view class="day-summary" wx:if="{{item.ai_summary && expandedDays[item.date]}}">
-          <text class="day-summary-text">🤖 {{item.ai_summary}}</text>
-        </view>
-
-        <!-- 事件列表 -->
-        <view class="day-events" wx:if="{{expandedDays[item.date]}}">
-          <view wx:for="{{item.events}}" wx:key="title" wx:for-item="event" class="event-item" bindtap="onEventTap" data-url="{{event.url}}">
-            <view class="event-score">{{event.score}}</view>
-            <view class="event-body">
-              <text class="event-title">{{event.title}}</text>
-              <text class="event-summary">{{event.summary}}</text>
-              <view class="event-meta">
-                <text class="event-source">{{event.source}}</text>
-                <text wx:for="{{event.tags}}" wx:key="*this" wx:for-item="tag" class="event-tag" catchtap="onTagTap" data-tag="{{tag}}">{{tag}}</text>
-              </view>
-            </view>
+          <view wx:if="{{item.ai_summary && expandedDays[item.date]}}" class="tl-insight">
+            💡 {{item.ai_summary}}
           </view>
         </view>
       </view>
     </view>
 
-    <!-- 空状态 -->
-    <view wx:if="{{!timeline.length}}" class="empty-state">
-      <text class="empty-icon">📊</text>
-      <text class="empty-text">暂无趋势数据，需要积累多天简报</text>
-    </view>
-
-    <!-- 底部提示 -->
-    <view class="trend-footer">
-      <text>每日自动汇总 · 点击事件可复制链接 · 点击标签搜索历史</text>
-    </view>
   </view>
 </view>

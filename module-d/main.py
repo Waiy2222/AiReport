@@ -18,7 +18,7 @@ from platforms import zhihu, csdn, weixin
 
 app = FastAPI(title="Module D - Multi-Platform Publisher + Long Image")
 
-PLATFORMS = ["zhihu", "csdn", "weixin_oa"]
+PLATFORMS = ["zhihu", "csdn", "weixin_oa", "douyin"]
 
 # asyncpg 将 JSONB 列返回为 Python 字符串，需手动解析
 _JSONB_FIELDS = {"tl_dr", "sections", "key_takeaways", "raw_stats"}
@@ -176,6 +176,7 @@ _CREDENTIAL_ENV_VARS = {
     "zhihu": ["ZHIHU_CLIENT_ID", "ZHIHU_CLIENT_SECRET"],
     "csdn": ["CSDN_USERNAME", "CSDN_PASSWORD"],
     "weixin_oa": ["WEIXIN_OA_APPID", "WEIXIN_OA_SECRET"],
+    "douyin": ["DOUYIN_AUTO_PUBLISH"],
 }
 
 
@@ -236,3 +237,39 @@ async def publish(req: PublishRequest):
     if longimage_path:
         response["longimage"] = longimage_path
     return response
+
+
+class PublishVideoRequest(BaseModel):
+    video_path: str
+    title: str = ""
+    tags: list[str] = []
+    cover_path: str = ""
+    platform: str = "douyin"  # 预留多平台扩展，目前仅支持 douyin
+
+
+@app.post("/publish-video")
+async def publish_video_endpoint(req: PublishVideoRequest):
+    """视频发布接口 — 通过浏览器自动化发布视频到抖音。
+
+    接受视频文件路径，由 Playwright 控制浏览器完成上传和发布。
+    模块 E 在视频生成完成后通过此接口自动触发发布。
+    """
+    if req.platform != "douyin":
+        raise HTTPException(400, f"unsupported video platform: {req.platform}")
+
+    if not req.video_path:
+        raise HTTPException(400, "video_path is required")
+
+    try:
+        from platforms.douyin import publish_video as douyin_publish
+
+        result = await douyin_publish(
+            video_path=req.video_path,
+            title=req.title or "AI早报",
+            tags=req.tags or ["AI", "人工智能", "科技", "AI早报"],
+            cover_path=req.cover_path if req.cover_path else None,
+        )
+        return result
+    except Exception as e:
+        logger.exception("视频发布失败")
+        raise HTTPException(500, f"video publish failed: {e}")

@@ -1,0 +1,92 @@
+<view class="container">
+
+  <!-- ══════ 输入区域 ══════ -->
+  <view class="input-zone">
+    <view class="input-hero">
+      <text class="input-icon">🎬</text>
+      <text class="input-title">AI 视频早报</text>
+      <text class="input-sub">输入关键词，AI 为你生成新闻视频</text>
+    </view>
+
+    <view class="input-row">
+      <input class="keyword-input" placeholder="例如：自动驾驶、AI芯片、电子竞技..."
+        value="{{keyword}}" bindinput="onKeywordInput" maxlength="100" />
+      <button class="gen-btn" bindtap="onGenerateVideo"
+        disabled="{{generating || !keyword}}">
+        {{generating ? '生成中' : '生成'}}
+      </button>
+    </view>
+
+    <!-- 快速标签 -->
+    <view class="quick-tags">
+      <text class="qt-label">💡 试试：</text>
+      <text class="qt" bindtap="onQuickTagTap" data-tag="AI智能体">AI智能体</text>
+      <text class="qt" bindtap="onQuickTagTap" data-tag="自动驾驶">自动驾驶</text>
+      <text class="qt" bindtap="onQuickTagTap" data-tag="芯片">芯片</text>
+      <text class="qt" bindtap="onQuickTagTap" data-tag="电子竞技">电子竞技</text>
+      <text class="qt" bindtap="onQuickTagTap" data-tag="医疗AI">医疗AI</text>
+    </view>
+  </view>
+
+  <!-- ══════ 视频列表 ══════ -->
+  <view class="list-zone">
+    <view class="list-header">
+      <text class="list-title">📼 历史视频</text>
+      <text class="list-count" wx:if="{{videos.length > 0}}">{{videos.length}} 个</text>
+    </view>
+
+    <!-- 空状态 -->
+    <view wx:if="{{!loading && videos.length === 0}}" class="empty-state">
+      <text class="empty-icon">🎥</text>
+      <text class="empty-text">还没有视频</text>
+      <text class="empty-hint">输入关键词生成第一个视频早报</text>
+    </view>
+
+    <!-- 加载中 -->
+    <view wx:if="{{loading && videos.length === 0}}" class="loading-state">
+      <text>加载中...</text>
+    </view>
+
+    <!-- 视频卡片列表 -->
+    <view wx:for="{{videos}}" wx:key="id" class="video-card"
+      bindtap="onPlayVideo" data-id="{{item.id}}">
+      <image class="vc-cover"
+        src="{{item.coverUrl || ''}}"
+        mode="aspectFill" />
+      <view class="vc-body">
+        <text class="vc-title">{{item.title || '未命名视频'}}</text>
+        <view class="vc-meta">
+          <text class="vc-status {{(item.status === 'done' || item.status === 'completed') ? 'done' : 'pending'}}">
+            {{(item.status === 'done' || item.status === 'completed') ? '✅ 已完成' : '⏳ 处理中'}}
+          </text>
+          <text class="vc-duration" wx:if="{{item.duration_seconds}}">
+            {{item.duration_seconds}}秒
+          </text>
+        </view>
+      </view>
+      <text class="vc-arrow">▶</text>
+    </view>
+
+    <!-- 加载更多 -->
+    <view wx:if="{{loading && videos.length > 0}}" class="loading-more">
+      <text>加载更多...</text>
+    </view>
+  </view>
+
+  <!-- ══════ 生成蒙层 ══════ -->
+  <view class="gen-overlay" wx:if="{{generating}}">
+    <view class="gen-card">
+      <view class="gen-spinner"></view>
+      <text class="gen-text">
+        {{pollCount < 15 ? '🔍 抓取新闻素材...' : (pollCount < 40 ? '✂️ 剪辑视频...' : (pollCount < 60 ? '🎙️ 生成配音...' : '✨ 最终合成...'))}}
+      </text>
+      <view class="gen-bar">
+        <view class="gen-fill" style="width:{{genProgress}}%"></view>
+      </view>
+      <text class="gen-time">⏱ {{pollCount * 2}}s</text>
+      <text class="gen-hint">视频生成需要 1-3 分钟，请耐心等待</text>
+      <button class="gen-cancel" bindtap="onCancelGeneration">取消</button>
+    </view>
+  </view>
+
+</view>

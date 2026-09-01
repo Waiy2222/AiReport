@@ -1,108 +1,106 @@
 <view class="container">
-  <!-- 用户信息 -->
-  <view class="user-card">
-    <view class="avatar">U</view>
-    <view class="user-info">
-      <view class="user-id">{{openidMasked}}</view>
-      <view class="user-hint">已登录</view>
+
+  <!-- ══════ 用户头像区 ══════ -->
+  <view class="user-hero">
+    <view class="user-avatar">U</view>
+    <text class="user-id">{{openidMasked}}</text>
+  </view>
+
+  <!-- ══════ 统计卡片 ══════ -->
+  <view class="stats-row">
+    <view class="stat-card">
+      <text class="stat-num">{{stats.myBriefings}}</text>
+      <text class="stat-label">专属简报</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-num">{{stats.followedTags}}</text>
+      <text class="stat-label">关注标签</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-num">{{stats.subscribed ? '✓' : '-'}}</text>
+      <text class="stat-label">推送订阅</text>
+    </view>
+    <view class="stat-card" bindtap="onGoVideo">
+      <text class="stat-num">{{stats.videoCount || '-'}}</text>
+      <text class="stat-label">生成视频</text>
     </view>
   </view>
 
-  <!-- AI 新闻问答入口 -->
-  <view class="chat-entry-card" bindtap="onChatEntry">
-    <view class="chat-entry-left">
-      <view class="chat-entry-icon">🤖</view>
-      <view class="chat-entry-info">
-        <view class="chat-entry-title">AI 新闻问答</view>
-        <view class="chat-entry-desc">想问什么新闻，直接问我</view>
-      </view>
+  <!-- ══════ 推送设置 ══════ -->
+  <view class="card">
+    <view class="card-head">
+      <text class="card-title">📢 推送设置</text>
+      <text class="card-hint">公众号模板消息</text>
     </view>
-    <view class="chat-entry-arrow">></view>
-  </view>
-
-  <!-- 标签偏好 -->
-  <view class="settings-block">
-    <view class="settings-title">我的兴趣标签</view>
-    <view class="tag-section">
-      <view class="tag-hint" wx:if="{{selectedTags.length === 0}}">未选择标签，将推送综合简报</view>
-      <view class="tag-hint selected" wx:else>已选 {{selectedTags.length}} 个标签，将推送个性化内容</view>
-      <view class="tag-grid">
-        <view
-          class="tag-chip {{item.disabled ? 'disabled' : ''}} {{item.selected ? 'selected' : ''}}"
-          wx:for="{{allTags}}"
-          wx:key="tag"
-          data-tag="{{item.tag}}"
-          bindtap="onTagTap"
-        >
-          <view class="tag-label">{{item.label_zh}}{{item.disabled ? ' (暂无)' : ''}}</view>
-          <view class="tag-desc">{{item.hasNews ? item.description : '当前简报无相关新闻'}}</view>
-        </view>
+    <view class="push-item">
+      <view class="push-info">
+        <text class="push-label">☀️ 早报推送</text>
+        <text class="push-desc">每日上午接收通用早报</text>
       </view>
-      <button class="save-btn" bindtap="onSavePreferences">保存偏好</button>
+      <switch checked="{{pushMorning}}" bindchange="onToggleMorning" color="#6366f1" />
+    </view>
+    <view class="push-item">
+      <view class="push-info">
+        <text class="push-label">🌙 晚报推送</text>
+        <text class="push-desc">每日傍晚接收通用晚报</text>
+      </view>
+      <switch checked="{{pushEvening}}" bindchange="onToggleEvening" color="#6366f1" />
     </view>
   </view>
 
-  <!-- Phase 3: 信源健康度 -->
-  <view class="settings-block">
-    <view class="settings-title">
-      信源健康度
-      <view class="health-pending-badge" wx:if="{{pendingRecommendations > 0}}">
-        🔔 {{pendingRecommendations}}个新信源待审核
-      </view>
+  <!-- ══════ 兴趣标签 ══════ -->
+  <view class="card">
+    <view class="card-head">
+      <text class="card-title">🏷️ 我的兴趣</text>
+      <text class="card-hint" wx:if="{{selectedTags.length}}">{{selectedTags.length}}个已选</text>
     </view>
-    <view class="health-list">
-      <view
-        class="health-item"
-        wx:for="{{sourceHealth}}"
-        wx:key="tag"
+    <view class="tag-cloud">
+      <view wx:for="{{allTags}}" wx:key="tag"
+        class="tag-pill {{item.selected ? 'on' : ''}} {{item.isUserTag ? 'user-tag' : ''}}"
+        data-tag="{{item.tag}}" bindtap="onTagTap"
       >
-        <view class="health-dot {{item.health}}"></view>
-        <view class="health-tag">{{item.label_zh || item.tag}}</view>
-        <view class="health-count">{{item.count}}条</view>
+        <text class="tp-emoji">{{item.selected ? '✓' : ''}}</text>
+        <text class="tp-label">{{item.label_zh}}</text>
+        <text wx:if="{{item.isUserTag}}" class="tp-badge">我的</text>
+        <text class="tp-del" data-tag="{{item.tag}}" data-action="remove" catchtap="onRemoveTag">✕</text>
       </view>
     </view>
-    <view class="health-hint" wx:if="{{sourceHealth.length === 0}}">
-      加载中...
+    <button class="save-btn" bindtap="onSavePreferences">
+      保存兴趣 → 首页看专属简报
+    </button>
+  </view>
+
+  <!-- ══════ 最近专属简报 ══════ -->
+  <view class="card" wx:if="{{recentBriefings.length > 0}}">
+    <view class="card-head">
+      <text class="card-title">📋 最近专属简报</text>
+      <text class="card-link" bindtap="onViewAllBriefings">查看全部 →</text>
+    </view>
+    <view wx:for="{{recentBriefings}}" wx:key="id" class="recent-item" bindtap="onBriefingTap" data-id="{{item.id}}">
+      <view class="recent-type {{item.type}}">{{item.type === 'morning' ? '☀️' : '🌙'}}</view>
+      <view class="recent-body">
+        <text class="recent-interest">{{item.interest_text || '专属简报'}}</text>
+        <text class="recent-date">{{item.date}}</text>
+      </view>
+      <text class="recent-arrow">→</text>
     </view>
   </view>
 
-  <!-- 订阅设置 -->
-  <view class="settings-block">
-    <view class="settings-title">推送订阅</view>
-
-    <view class="setting-item">
-      <view class="setting-label">
-        <view class="setting-name">每日早报</view>
-        <view class="setting-desc">每天早上 8:00 推送</view>
-      </view>
-      <switch
-        checked="{{morningEnabled}}"
-        bindchange="onToggleMorning"
-        color="#4a90d9"
-      />
+  <!-- ══════ 设置 ══════ -->
+  <view class="card">
+    <view class="card-head">
+      <text class="card-title">⚙️ 设置</text>
     </view>
-
-    <view class="setting-item">
-      <view class="setting-label">
-        <view class="setting-name">每日晚报</view>
-        <view class="setting-desc">每天晚上 20:00 推送</view>
-      </view>
-      <switch
-        checked="{{eveningEnabled}}"
-        bindchange="onToggleEvening"
-        color="#4a90d9"
-      />
+    <view class="setting-item" bindtap="onClearCache">
+      <text class="setting-label">🗑️ 清除本地缓存</text>
+      <text class="setting-desc">标签偏好、活标签</text>
+      <text class="setting-arrow">→</text>
     </view>
-  </view>
-
-  <!-- 关于 -->
-  <view class="settings-block">
     <view class="setting-item" bindtap="onAbout">
-      <view class="setting-label">
-        <view class="setting-name">关于</view>
-        <view class="setting-desc">AI 资讯简报 v2.0</view>
-      </view>
-      <view class="arrow">></view>
+      <text class="setting-label">ℹ️ 关于</text>
+      <text class="setting-desc">AI 资讯简报 v2.0</text>
+      <text class="setting-arrow">→</text>
     </view>
   </view>
+
 </view>

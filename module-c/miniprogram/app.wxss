@@ -1,53 +1,255 @@
+/* ══════════════════════════════════════════
+   AI 资讯简报 — 全局设计系统 v2.0
+   ══════════════════════════════════════════ */
+
+/* ── CSS 变量 ── */
 page {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 15px;
-  color: #333;
-  background-color: #f5f5f5;
+  /* 主色调 — 通用简报 & 全局 */
+  --primary: #4a6cf7;
+  --primary-light: #eef1ff;
+  --primary-dark: #3b54d4;
+
+  /* 专属简报色调 — 紫色系 */
+  --primary-indigo: #6366f1;
+  --primary-purple: #8b5cf6;
+  --primary-deep: #4338ca;
+  --gradient-personal: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
+  --gradient-accent: linear-gradient(135deg, #f59e0b, #f97316);
+
+  /* 辅助色 */
+  --accent-orange: #f59e0b;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-purple: #8b5cf6;
+  --accent-cyan: #06b6d4;
+
+  /* 中性色 */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* 背景 */
+  --bg-page: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-input: #f1f5f9;
+  --bg-dark: #1e293b;
+
+  /* 边框 */
+  --border-light: #e2e8f0;
+  --border-lighter: #f1f5f9;
+
+  /* 阴影 */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 8rpx 32rpx rgba(0, 0, 0, 0.12);
+
+  /* 圆角 */
+  --radius-sm: 8rpx;
+  --radius-md: 12rpx;
+  --radius-lg: 16rpx;
+  --radius-xl: 20rpx;
+  --radius-card: 20rpx;
+  --radius-full: 9999rpx;
+
+  /* 动画 */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
 }
 
+/* ── 全局重置 ── */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  color: var(--text-primary);
+  background-color: var(--bg-page);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 通用容器 ── */
 .container {
-  padding: 16px;
+  padding: 24rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
 }
 
+/* ── 通用卡片 ── */
 .card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: var(--shadow-xs);
+  border: 1rpx solid var(--border-lighter);
+  transition: box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.card:active {
+  box-shadow: var(--shadow-sm);
 }
 
 .card-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin-bottom: 8px;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12rpx;
+  letter-spacing: -0.01em;
 }
 
 .card-subtitle {
-  font-size: 13px;
-  color: #999;
+  font-size: 24rpx;
+  color: var(--text-tertiary);
 }
 
+/* ── 通用标签 ── */
 .tag {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: #4a90d9;
-  background: #e8f0fe;
-  margin-right: 6px;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 14rpx;
+  border-radius: var(--radius-full);
+  font-size: 22rpx;
+  font-weight: 500;
+  color: var(--primary);
+  background: var(--primary-light);
+  margin-right: 8rpx;
+  margin-top: 6rpx;
+  line-height: 1.4;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 80px 20px;
-  color: #999;
-}
-
+/* ── 加载状态 ── */
 .loading {
-  text-align: center;
-  padding: 40px;
-  color: #999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+  color: var(--text-tertiary);
+  font-size: 26rpx;
+}
+
+.loading-spinner {
+  width: 56rpx;
+  height: 56rpx;
+  border: 4rpx solid var(--border-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-bottom: 20rpx;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── 空状态 ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 140rpx 40rpx;
+  color: var(--text-tertiary);
+  font-size: 26rpx;
+}
+
+.empty-icon {
+  font-size: 88rpx;
+  display: block;
+  margin-bottom: 16rpx;
+  opacity: 0.6;
+}
+
+.empty-hint {
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  margin-top: 8rpx;
+  display: block;
+}
+
+/* ── 渐入动画 ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeInUp 0.35s var(--ease-out) both;
+}
+
+/* ── 骨架屏闪烁 ── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── 渐变文字 ── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary), var(--primary-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── 卡片点击态 ── */
+.card-hover {
+  transition: all 0.2s var(--ease-out);
+}
+.card-hover:active {
+  box-shadow: var(--shadow-md);
+  transform: scale(0.985);
+}
+
+/* ── 统计数字 ── */
+.stat-number {
+  font-size: 40rpx;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), var(--primary-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── 通用分隔线 ── */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 8rpx 0 20rpx;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1rpx;
+  background: var(--border-light);
+}
+.divider-text {
+  padding: 0 20rpx;
+  font-size: 24rpx;
+  color: var(--text-tertiary);
 }

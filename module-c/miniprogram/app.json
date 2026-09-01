@@ -1,10 +1,11 @@
 {
   "pages": [
-    "pages/chat/chat",
     "pages/index/index",
+    "pages/briefing/briefing",
     "pages/detail/detail",
     "pages/history/history",
-    "pages/trends/trends",
+    "pages/video/video",
+    "pages/video-player/video-player",
     "pages/mine/mine"
   ],
   "window": {
@@ -26,16 +27,22 @@
         "selectedIconPath": "images/index-active.png"
       },
       {
+        "pagePath": "pages/briefing/briefing",
+        "text": "专属简报",
+        "iconPath": "images/briefing.png",
+        "selectedIconPath": "images/briefing-active.png"
+      },
+      {
         "pagePath": "pages/history/history",
         "text": "历史",
         "iconPath": "images/history.png",
         "selectedIconPath": "images/history-active.png"
       },
       {
-        "pagePath": "pages/trends/trends",
-        "text": "趋势",
-        "iconPath": "images/trends.png",
-        "selectedIconPath": "images/trends-active.png"
+        "pagePath": "pages/video/video",
+        "text": "视频",
+        "iconPath": "images/video.png",
+        "selectedIconPath": "images/video-active.png"
       },
       {
         "pagePath": "pages/mine/mine",

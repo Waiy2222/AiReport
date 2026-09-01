@@ -8,4 +8,12 @@ dist/
 build/
 .DS_Store
 module-f/downloads/*.mp4
+module-f/downloads/
+module-f/output/
+module-d/output/
+module-b/longimage_output/
+.pytest_cache/
 .claude/
+# Douyin publisher — sensitive login cookies
+module-d/douyin_cookies.json
+module-d/douyin_debug_screenshot.png

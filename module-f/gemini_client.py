@@ -132,10 +132,11 @@ class GeminiClient:
     # ---- mock -----------------------------------------------------------
 
     def _mock_result(self, path: str, context: str) -> dict[str, Any]:
+        domain = os.getenv("VIDEO_DOMAIN", "AI")
         return {
             "video_path": path,
-            "summary": f"AI-related clip from {os.path.basename(path)}",
-            "topics": ["AI", "agent"],
+            "summary": f"{domain}-related clip from {os.path.basename(path)}",
+            "topics": [domain],
             "relevance_score": 7.5,
             "suggested_clip_range": {"start_sec": 0, "end_sec": 30},
             "quality_notes": "Good quality, clear visuals",
@@ -147,13 +148,17 @@ class GeminiClient:
 # helpers
 # ---------------------------------------------------------------------------
 
-def _build_analysis_prompt(context: str) -> str:
+def _build_analysis_prompt(context: str, domain: str = "") -> str:
     ctx = f"\n额外背景: {context}" if context else ""
+    domain_label = domain or os.getenv("VIDEO_DOMAIN", "AI")
+    # Dynamic domain display: use known presets, fall back to domain_label itself
+    _PRESET_DISPLAY = {"AI": "AI智能体", "体育": "体育", "芯片": "芯片", "机器人": "机器人", "医疗": "医疗", "自动驾驶": "自动驾驶", "融资": "科技创投"}
+    domain_display = _PRESET_DISPLAY.get(domain_label) or os.getenv("VIDEO_DOMAIN_DISPLAY") or domain_label
     return (
         "你是一个视频内容分析助手。请按以下格式分析这组视频关键帧（按时间顺序排列）：\n"
         "1. 总结视频的主要内容（2-3句中文）\n"
-        "2. 列出涉及的AI/技术主题（逗号分隔）\n"
-        "3. 评估与AI智能体领域的相关度（0-10分）\n"
+        f"2. 列出涉及的技术/{domain_display}主题（逗号分隔）\n"
+        f"3. 评估与{domain_display}领域的相关度（0-10分）\n"
         "4. 建议剪辑区间（起止秒数）\n"
         "5. 画质/音质简要评价\n"
         f"{ctx}\n"
@@ -199,10 +204,11 @@ def _parse_analysis(raw: str, path: str, context: str) -> dict[str, Any]:
     except (json.JSONDecodeError, ValueError):
         logger.warning("Failed to parse Qwen-VL response as JSON")
 
+    domain = os.getenv("VIDEO_DOMAIN", "AI")
     return {
         "video_path": path,
         "summary": raw[:300],
-        "topics": ["AI"],
+        "topics": [domain],
         "relevance_score": 5.0,
         "suggested_clip_range": {"start_sec": 0, "end_sec": 30},
         "quality_notes": "",

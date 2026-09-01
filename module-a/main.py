@@ -36,6 +36,8 @@ async def shutdown():
 class FetchRequest(BaseModel):
     batch_id: uuid.UUID = Field(..., description="批次唯一标识")
     hours_back: int = Field(default=12, ge=1, le=168, description="回溯小时数")
+    search_keywords: list[str] = Field(default=[], description="个性化搜索关键词（用于 Google News 动态抓取）")
+    search_only: bool = Field(default=False, description="仅关键词搜索，跳过常规 RSS（个性化简报用）")
 
 
 @app.get("/health")
@@ -82,7 +84,9 @@ async def run(req: FetchRequest):
 
     from orchestrator import run_pipeline
 
-    result = await run_pipeline(pool, since, req.batch_id, SOURCES)
+    sources = [] if req.search_only else SOURCES
+    result = await run_pipeline(pool, since, req.batch_id, sources,
+                                search_keywords=req.search_keywords)
 
     all_zero = all(v == 0 for v in result["per_source"].values())
     status = "partial" if all_zero else "ok"

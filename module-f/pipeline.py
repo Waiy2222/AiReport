@@ -34,7 +34,7 @@ import asyncpg
 import httpx
 
 from gemini_client import GeminiClient
-from video_search import VideoSearcher
+from video_search import VideoSearcher, set_active_domain as _vs_set_active_domain
 from editor import VideoEditor
 from tts import TTSEngine
 from subtitle import SubtitleGenerator
@@ -44,6 +44,239 @@ logger = logging.getLogger(__name__)
 OUTPUT_DIR = Path(os.getenv("VIDEO_OUTPUT_DIR", str(Path(__file__).parent / "output"))).resolve()
 DOWNLOAD_DIR = Path(os.getenv("VIDEO_DOWNLOAD_DIR", str(Path(__file__).parent / "downloads"))).resolve()
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ai_news")
+_VIDEO_DOMAIN = os.getenv("VIDEO_DOMAIN", "AI")
+_ACTIVE_DOMAIN: str | None = None  # set by run_full_pipeline when keyword is provided
+
+
+def _get_domain_config(domain: str | None = None) -> dict:
+    """Return domain configuration dict.
+
+    1. If domain is a known preset in _DOMAIN_CONFIG → use it directly.
+    2. Otherwise → dynamically build config from env vars / domain name itself,
+       so ANY domain value works without editing Python code.
+
+    Env vars for custom domains (all optional, sensible defaults from domain name):
+      VIDEO_DOMAIN_DISPLAY       - display name (default: domain name)
+      VIDEO_DOMAIN_CATEGORY      - RSS category (default: domain name)
+      VIDEO_DOMAIN_BADGE         - cover badge text (default: {display}早报)
+      VIDEO_DOMAIN_HOST          - virtual host name (default: AI主播)
+      VIDEO_DOMAIN_BROLL_FALLBACK- B-roll fallback search keywords
+      VIDEO_DOMAIN_PEXELS_QUERY  - Pexels search query
+      VIDEO_DOMAIN_PROMPT_CONTEXT- LLM prompt: topic areas to cover
+      VIDEO_DOMAIN_PROMPT_FOCUS  - LLM prompt: focus areas
+    """
+    key = (domain or _ACTIVE_DOMAIN or _VIDEO_DOMAIN).strip()
+    if key in _DOMAIN_CONFIG:
+        return _DOMAIN_CONFIG[key]
+
+    # ── Dynamic domain: build config from env vars ──
+    display = os.getenv("VIDEO_DOMAIN_DISPLAY", key).strip() or key
+    category = os.getenv("VIDEO_DOMAIN_CATEGORY", key).strip() or key
+    badge = os.getenv("VIDEO_DOMAIN_BADGE", f"{display}早报").strip()
+    host = os.getenv("VIDEO_DOMAIN_HOST", "AI主播").strip()
+    broll_fallback = os.getenv("VIDEO_DOMAIN_BROLL_FALLBACK", display).strip()
+    pexels_query = os.getenv("VIDEO_DOMAIN_PEXELS_QUERY", key).strip()
+    prompt_context = os.getenv("VIDEO_DOMAIN_PROMPT_CONTEXT", display).strip()
+    prompt_focus = os.getenv("VIDEO_DOMAIN_PROMPT_FOCUS", "").strip()
+
+    # Optional JSON-configured fields
+    en_to_cn: dict[str, str] = {}
+    agent_core: list[str] = []
+    agent_products: list[str] = []
+    try:
+        raw = os.getenv("VIDEO_DOMAIN_EN_TO_CN", "")
+        if raw:
+            en_to_cn = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("VIDEO_DOMAIN_EN_TO_CN is not valid JSON, ignoring")
+    try:
+        raw = os.getenv("VIDEO_DOMAIN_AGENT_CORE", "")
+        if raw:
+            agent_core = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("VIDEO_DOMAIN_AGENT_CORE is not valid JSON, ignoring")
+    try:
+        raw = os.getenv("VIDEO_DOMAIN_AGENT_PRODUCTS", "")
+        if raw:
+            agent_products = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("VIDEO_DOMAIN_AGENT_PRODUCTS is not valid JSON, ignoring")
+
+    logger.info("Dynamic domain %r: display=%r category=%r", key, display, category)
+    return {
+        "label": key,
+        "display": display,
+        "category": category,
+        "badge": badge,
+        "host": host,
+        "broll_fallback": broll_fallback,
+        "pexels_query": pexels_query,
+        "prompt_context": prompt_context,
+        "prompt_focus": prompt_focus,
+        "en_to_cn": en_to_cn,
+        "agent_core": agent_core,
+        "agent_products": agent_products,
+    }
+
+
+_DOMAIN_CONFIG: dict[str, dict] = {
+    # ── AI / 智能体（默认） ──
+    "AI": {
+        "label": "AI",
+        "display": "AI智能体",
+        "category": "科技",
+        "badge": "AI 早报",
+        "host": "AI主播",
+        "broll_fallback": "AI科技 智能体 Agent",
+        "pexels_query": "artificial intelligence technology digital data",
+        "prompt_context": "LLM（大模型）、Agent（智能体）、开源、工具、科技、行业、全球、芯片、机器人、自动驾驶、融资、医疗",
+        "prompt_focus": "Agent / 智能体: 桌面智能体、编程智能体、办公智能体、多智能体协作、MCP协议等",
+        # English→Chinese keyword map for B站 search (AI domain)
+        "en_to_cn": {
+            "github": "开源项目", "deepseek": "深度求索", "copilot": "编程助手",
+            "claude": "", "chatgpt": "", "openai": "OpenAI",
+            "gemini": "", "agent": "智能体", "openhuman": "桌面智能体",
+            "crewai": "多智能体框架", "autogpt": "自动智能体",
+            "devin": "AI编程", "cursor": "AI编程工具",
+            "openclaw": "桌面操控", "dumate": "办公智能体",
+            "manus": "AI智能体", "langgraph": "AI工作流",
+            "dify": "AI应用平台", "coze": "AI应用平台",
+            "mcp": "模型上下文协议", "a2a": "多智能体协作",
+            "comfyui": "AI工作流", "n8n": "自动化工作流",
+            "huggingface": "AI开源", "ollama": "本地大模型",
+        },
+        # Agent-specific keywords for news filtering (Agent tag priority)
+        "agent_core": [
+            "agent", "智能体", "agentic", "自主", "multi-agent", "多智能体", "多agent",
+            "桌面智能", "desktop agent", "电脑操控", "电脑操作", "computer use",
+            "gui自动化", "gui automation", "浏览器智能体", "browser agent",
+            "编程智能体", "coding agent", "代码agent", "办公智能体", "办公agent",
+            "工具调用", "function call", "tool use", "任务规划", "task planning",
+            "自主执行", "工作流自动化", "workflow automation", "mcp", "model context protocol",
+            "a2a", "agent-to-agent",
+        ],
+        "agent_products": [
+            "openhuman", "openclaw", "dumate", "genflow", "crewai", "autogpt",
+            "babyagi", "agentgpt", "copilot", "cursor", "windsurf", "devin",
+            "manus", "aionui", "echobot", "superpowers", "claude code",
+            "gemini agent", "copilot studio", "langgraph", "langflow", "dify",
+            "coze", "扣子", "百炼", "元器",
+        ],
+    },
+    # ── 体育 ──
+    "体育": {
+        "label": "体育",
+        "display": "体育",
+        "category": "体育",
+        "badge": "体育早报",
+        "host": "AI主播",
+        "broll_fallback": "体育赛事 竞技",
+        "pexels_query": "sports competition athletics stadium",
+        "prompt_context": "足球、篮球、网球、F1、综合格斗、奥运会等主流体育赛事",
+        "prompt_focus": "赛事结果、转会动态、运动员动态、联赛排名",
+        "en_to_cn": {
+            "nba": "NBA篮球", "nfl": "橄榄球", "mlb": "棒球", "ufc": "综合格斗",
+            "fifa": "国际足联", "uefa": "欧冠", "premier": "英超",
+            "laliga": "西甲", "seriea": "意甲", "bundesliga": "德甲",
+        },
+        "agent_core": [],
+        "agent_products": [],
+    },
+    # ── 芯片 ──
+    "芯片": {
+        "label": "芯片",
+        "display": "芯片",
+        "category": "芯片",
+        "badge": "芯片早报",
+        "host": "AI主播",
+        "broll_fallback": "芯片 半导体 处理器",
+        "pexels_query": "computer chip semiconductor processor technology",
+        "prompt_context": "芯片设计、半导体制造、处理器架构、GPU/CPU/NPU、EDA工具、晶圆代工",
+        "prompt_focus": "芯片发布、制程工艺、架构迭代、半导体产业链动态",
+        "en_to_cn": {
+            "nvidia": "英伟达", "amd": "AMD", "intel": "英特尔",
+            "tsmc": "台积电", "samsung": "三星", "qualcomm": "高通",
+            "arm": "ARM架构", "riscv": "RISC-V", "gpu": "GPU显卡",
+            "cpu": "CPU处理器", "npu": "AI芯片", "hbm": "高带宽内存",
+        },
+        "agent_core": [],
+        "agent_products": [],
+    },
+    # ── 机器人 ──
+    "机器人": {
+        "label": "机器人",
+        "display": "机器人",
+        "category": "机器人",
+        "badge": "机器人早报",
+        "host": "AI主播",
+        "broll_fallback": "机器人 自动化 AI",
+        "pexels_query": "robot automation technology factory",
+        "prompt_context": "人形机器人、工业机器人、具身智能、机械臂、自动化、ROS、传感器",
+        "prompt_focus": "机器人新品发布、人形机器人进展、自动化落地案例、融资动态",
+        "en_to_cn": {
+            "robot": "机器人", "robotics": "机器人技术",
+            "boston": "波士顿动力", "tesla": "特斯拉",
+            "humanoid": "人形机器人", "ros": "机器人系统",
+            "embodied": "具身智能", "actuator": "执行器",
+        },
+        "agent_core": [],
+        "agent_products": [],
+    },
+    # ── 医疗 ──
+    "医疗": {
+        "label": "医疗",
+        "display": "医疗",
+        "category": "医疗",
+        "badge": "医疗早报",
+        "host": "AI主播",
+        "broll_fallback": "医疗 AI 医学",
+        "pexels_query": "medical healthcare technology research",
+        "prompt_context": "AI医疗、药物研发、基因编辑、医疗器械、临床试验、数字健康",
+        "prompt_focus": "新药获批、临床试验进展、医疗AI应用、医疗器械创新",
+        "en_to_cn": {
+            "fda": "FDA审批", "crispr": "基因编辑", "mrna": "mRNA疫苗",
+            "alphafold": "蛋白质预测", "clinical": "临床试验",
+            "diagnosis": "诊断", "therapy": "治疗",
+        },
+        "agent_core": [],
+        "agent_products": [],
+    },
+    # ── 自动驾驶 ──
+    "自动驾驶": {
+        "label": "自动驾驶",
+        "display": "自动驾驶",
+        "category": "自动驾驶",
+        "badge": "自动驾驶早报",
+        "host": "AI主播",
+        "broll_fallback": "自动驾驶 智能汽车",
+        "pexels_query": "autonomous driving car technology road",
+        "prompt_context": "自动驾驶、智能汽车、激光雷达、FSD、Robotaxi、车路协同、ADAS",
+        "prompt_focus": "自动驾驶政策、FSD更新、Robotaxi运营、车企智驾方案",
+        "en_to_cn": {
+            "tesla": "特斯拉", "waymo": "Waymo", "fsd": "全自动驾驶",
+            "lidar": "激光雷达", "robotaxi": "无人出租车",
+            "adas": "辅助驾驶", "cruise": "Cruise",
+        },
+        "agent_core": [],
+        "agent_products": [],
+    },
+    # ── 融资（科技创投） ──
+    "融资": {
+        "label": "融资",
+        "display": "科技创投",
+        "category": "科技",
+        "badge": "创投早报",
+        "host": "AI主播",
+        "broll_fallback": "科技 融资 创投",
+        "pexels_query": "startup business technology investment",
+        "prompt_context": "科技融资、IPO上市、创投动态、收购并购、估值变化",
+        "prompt_focus": "大额融资、独角兽动态、IPO消息、并购整合",
+        "en_to_cn": {},
+        "agent_core": [],
+        "agent_products": [],
+    },
+}
+
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,25 +300,24 @@ class VideoPipeline:
 
     # ---- public API -------------------------------------------------------
 
-    async def start(self, video_id: str, vtype: str, vdate: date) -> dict:
+    async def start(self, video_id: str, vtype: str, vdate: date, keyword: str | None = None) -> dict:
         pool = await self._get_pool()
 
+        # Check for duplicate processing task (same video_id)
         existing = await pool.fetchrow(
-            "SELECT id, status FROM videos WHERE type = $1 AND date = $2",
-            vtype, vdate,
+            "SELECT id, status FROM videos WHERE id = $1::uuid", video_id,
         )
         if existing:
-            vid = str(existing["id"])
             if existing["status"] in ("pending", "processing"):
-                return {"id": vid, "status": existing["status"], "type": vtype, "date": vdate.isoformat()}
-            await pool.execute("DELETE FROM videos WHERE id = $1", existing["id"])
+                return {"id": video_id, "status": existing["status"], "type": vtype, "date": vdate.isoformat()}
 
         await pool.execute(
-            "INSERT INTO videos (id, type, date, status) VALUES ($1, $2, $3, 'processing')",
-            video_id, vtype, vdate,
+            "INSERT INTO videos (id, type, date, status, keyword) VALUES ($1, $2, $3, 'processing', $4)"
+            " ON CONFLICT (id) DO UPDATE SET status = 'processing', keyword = $4",
+            video_id, vtype, vdate, keyword or vtype,
         )
 
-        task = asyncio.create_task(self._run_and_catch(video_id, vtype, vdate))
+        task = asyncio.create_task(self._run_and_catch(video_id, vtype, vdate, keyword=keyword))
         self._tasks[video_id] = task
 
         return {"id": video_id, "status": "processing", "type": vtype, "date": vdate.isoformat()}
@@ -115,14 +347,26 @@ class VideoPipeline:
                 val = d.get(key)
                 if isinstance(val, (date, datetime)):
                     d[key] = val.isoformat()
+            # Flatten cover_path from metadata JSON to top level
+            meta_raw = d.get("metadata")
+            if isinstance(meta_raw, str):
+                try:
+                    meta = json.loads(meta_raw)
+                    d["cover_path"] = meta.get("cover_path", "")
+                except (json.JSONDecodeError, TypeError):
+                    d["cover_path"] = ""
+            elif isinstance(meta_raw, dict):
+                d["cover_path"] = meta_raw.get("cover_path", "")
+            else:
+                d["cover_path"] = ""
             results.append(d)
         return results
 
     # ---- background task --------------------------------------------------
 
-    async def _run_and_catch(self, video_id: str, vtype: str, vdate: date):
+    async def _run_and_catch(self, video_id: str, vtype: str, vdate: date, keyword: str | None = None):
         try:
-            output_path = await self.run_full_pipeline(video_id, vtype, vdate)
+            output_path = await self.run_full_pipeline(video_id, vtype, vdate, keyword=keyword)
             pool = await self._get_pool()
             await pool.execute(
                 "UPDATE videos SET status = 'done', output_path = $1, finished_at = now() WHERE id = $2",
@@ -143,11 +387,20 @@ class VideoPipeline:
     # FULL 10-STEP PIPELINE (unified from run_local.py)
     # ════════════════════════════════════════════════════════════════════
 
-    async def run_full_pipeline(self, video_id: str, vtype: str, vdate: date) -> str:
+    async def run_full_pipeline(self, video_id: str, vtype: str, vdate: date, keyword: str | None = None) -> str:
+        global _ACTIVE_DOMAIN
         pool = await self._get_pool()
         video_dir = OUTPUT_DIR / video_id
         video_dir.mkdir(parents=True, exist_ok=True)
         today = vdate.isoformat()
+
+        # Resolve domain: keyword takes priority, then env var, then default "AI"
+        _domain_key = keyword or _VIDEO_DOMAIN
+        _ACTIVE_DOMAIN = _domain_key
+        dc = _get_domain_config()
+
+        # Inject into video_search so all filters become domain-aware
+        _vs_set_active_domain(_domain_key, dc)
 
         # ---- Step -1: fetch intro background ----
         intro_bg = await _fetch_intro_background(video_dir)
@@ -192,22 +445,10 @@ class VideoPipeline:
                     continue
 
                 news_segment_count += 1
-                keywords = seg.get("broll_keywords", "AI 科技")
+                keywords = seg.get("broll_keywords", _get_domain_config()["broll_fallback"])
 
-                # Preprocess keywords for B站
-                _EN_TO_CN = {
-                    "github": "开源项目", "deepseek": "深度求索", "copilot": "编程助手",
-                    "claude": "", "chatgpt": "", "openai": "OpenAI",
-                    "gemini": "", "agent": "智能体", "openhuman": "桌面智能体",
-                    "crewai": "多智能体框架", "autogpt": "自动智能体",
-                    "devin": "AI编程", "cursor": "AI编程工具",
-                    "openclaw": "桌面操控", "dumate": "办公智能体",
-                    "manus": "AI智能体", "langgraph": "AI工作流",
-                    "dify": "AI应用平台", "coze": "AI应用平台",
-                    "mcp": "模型上下文协议", "a2a": "多智能体协作",
-                    "comfyui": "AI工作流", "n8n": "自动化工作流",
-                    "huggingface": "AI开源", "ollama": "本地大模型",
-                }
+                # Preprocess keywords for B站 (domain-aware EN→CN mapping)
+                _EN_TO_CN = _get_domain_config().get("en_to_cn", {})
                 clean_kw: list[str] = []
                 for w in keywords.split():
                     wl = w.lower().strip()
@@ -222,10 +463,16 @@ class VideoPipeline:
                 keywords = " ".join(clean_kw) if clean_kw else keywords
                 keywords = re.sub(r'([^\w\s])\1+', r'\1', keywords)
 
+                # Enrich sparse keywords with domain context
+                if len(keywords.split()) <= 2:
+                    dc_broll = _get_domain_config()["broll_fallback"]
+                    dc_kws = set(keywords.split()) | set(dc_broll.split())
+                    keywords = " ".join(dc_kws)
+
                 topic_clean = topic.split("：", 1)[-1].strip() if "：" in topic else topic
                 results: list[dict] = []
 
-                # Strategy 1: BROLL keywords
+                # Strategy 1: BROLL keywords (enriched)
                 results = await self.searcher.search(keywords, max_results=5)
                 logger.info("[F:%s]   搜索段%d (BROLL): %s -> %d 结果", video_id, i, keywords[:40], len(results))
 
@@ -240,14 +487,18 @@ class VideoPipeline:
                                 results.append(r)
                         logger.info("[F:%s]   搜索段%d (主题词): %s -> +%d", video_id, i, topic_terms[:40], len(kw_results))
 
-                # Strategy 3: broader AI search (Agent-specific terms, not generic)
+                # Strategy 3: domain fallback search
                 if not results:
-                    results = await self.searcher.search("AI智能体 Agent 编程 开源", max_results=3)
+                    results = await self.searcher.search(_get_domain_config()["broll_fallback"], max_results=3)
                     logger.info("[F:%s]   搜索段%d (兜底): -> %d 结果", video_id, i, len(results))
 
                 # Domain gate + relevance scoring
-                scored = _score_clip_relevance(results, topic_clean + " " + keywords)
-                results = [s[0] for s in scored if s[1] >= 3]
+                # Build richer scoring context: topic + keywords + domain display
+                score_context = topic_clean + " " + keywords + " " + _get_domain_config()["display"]
+                scored = _score_clip_relevance(results, score_context)
+                # Adaptive threshold: higher when we have strong domain context
+                threshold = 5 if len(_build_domain_context()) > 5 else 3
+                results = [s[0] for s in scored if s[1] >= threshold]
                 if not results and scored:
                     results = [s[0] for s in scored[:2]]
 
@@ -272,7 +523,52 @@ class VideoPipeline:
                                 video_id, news_segment_count - broll_failures, news_segment_count, broll_failures)
             break
 
-        # ---- Step 3: download B-roll clips ----
+        
+        # ---- Step 2.6: search online photos (B站 covers = most relevant visual) ----
+        logger.info("[F:%s] Step 2.6: 搜索在线图片...", video_id)
+        segment_images: list[list[dict]] = []
+        for i, seg in enumerate(segments):
+            topic = seg.get("topic", "")
+            if "开场" in topic or "结尾" in topic:
+                segment_images.append([])
+                continue
+            broll_kw = seg.get("broll_keywords", "")
+            # Use broll_keywords directly as B站 query (DeepSeek generates sports-specific terms)
+            # Fall back to entity + domain if empty
+            bili_q = broll_kw.strip() if broll_kw.strip() else _get_domain_config()["broll_fallback"]
+            imgs = []
+            try:
+                bili_covers = await asyncio.wait_for(
+                    self.searcher._search_bilibili_covers(bili_q, max_results=6), timeout=15)
+                if bili_covers:
+                    imgs.extend(bili_covers)
+            except Exception:
+                pass
+            # Also try with entity name
+            entity = _extract_main_entity(topic.split("：", 1)[-1].strip() if "：" in topic else topic)
+            if entity and entity not in bili_q:
+                try:
+                    more = await asyncio.wait_for(
+                        self.searcher._search_bilibili_covers(entity, max_results=3), timeout=12)
+                    seen = {img.get("url", "") for img in imgs}
+                    for m in more:
+                        if m.get("url", "") not in seen:
+                            imgs.append(m)
+                except Exception:
+                    pass
+            # Pexels fallback: if B站 returns nothing, try general image search
+            if not imgs:
+                try:
+                    fallback_q = bili_q if any(ord(c) < 128 for c in bili_q) else _get_domain_config()["broll_fallback"]
+                    general = await asyncio.wait_for(
+                        self.searcher.search_images(fallback_q, max_results=5), timeout=20)
+                    imgs.extend(general)
+                except Exception:
+                    pass
+            segment_images.append(imgs)
+            logger.info("[F:%s]   段%d: %d张图片 for '%s'", video_id, i, len(imgs), bili_q[:30])
+
+# ---- Step 3: download B-roll clips ----
         logger.info("[F:%s] Step 3: 下载B-roll素材...", video_id)
         downloaded: list[list[str]] = []
 
@@ -303,6 +599,28 @@ class VideoPipeline:
                 except Exception as e:
                     logger.warning("[F:%s]   下载失败: %s", video_id, e)
             downloaded.append(seg_downloads)
+
+        # ---- Image fallback: use B站 cover images when no video clips ----
+        for i, seg_downloads in enumerate(downloaded):
+            if seg_downloads:
+                continue  # Already have video clips
+            images = segment_images[i] if i < len(segment_images) else []
+            if not images:
+                continue
+            seg_text = segments[i].get("text", "")
+            est_dur = max(5.0, len(seg_text) / 3.5)
+            for j, img in enumerate(images[:3]):
+                try:
+                    local = await self.searcher.download_image(img.get("url", ""))
+                    if local:
+                        kb_path = str(video_dir / f"kenburns_{i:02d}_{j:02d}.mp4")
+                        kb_dur = max(4.0, est_dur / max(len(images[:3]), 1))
+                        if self.editor.image_to_video(local, kb_path, kb_dur):
+                            seg_downloads.append(kb_path)
+                except Exception:
+                    pass
+            if seg_downloads:
+                logger.info("[F:%s]   段%d: 0视频 -> %d图片 (图像模式)", video_id, i, len(seg_downloads))
 
         total_clips = sum(len(d) for d in downloaded)
         if total_clips == 0:
@@ -377,12 +695,12 @@ class VideoPipeline:
 
         for i, (clip_paths, target_dur) in enumerate(zip(downloaded, segment_durations)):
             seg_trimmed: list[str] = []
-            if not clip_paths:
-                seg = segments[i]
-                topic = seg.get("topic", "")
-                is_opening = "开场" in topic or "概述" in topic
-                is_closing = "结尾" in topic or "总结" in topic
+            seg = segments[i]
+            topic = seg.get("topic", "")
+            is_opening = "开场" in topic or "概述" in topic
+            is_closing = "结尾" in topic or "总结" in topic
 
+            if not clip_paths:
                 if is_opening:
                     title_path = str(video_dir / f"title_card_{i:02d}.mp4")
                     _generate_title_card(title_path, today, target_dur, background_video=intro_bg)
@@ -393,7 +711,7 @@ class VideoPipeline:
                     _generate_title_card(close_path, today, target_dur,
                                          background_video=intro_bg,
                                          title_text="感谢收看",
-                                         subtitle_text="AI早报 明日再见",
+                                         subtitle_text=f"{_get_domain_config()['display']}早报 明日再见",
                                          font_size=64)
                     seg_trimmed.append(close_path)
                     logger.info("[F:%s]   段%d [%s]: 片尾卡 (%.0fs)", video_id, i, topic, target_dur)
@@ -405,7 +723,7 @@ class VideoPipeline:
                 trimmed_segments.append(seg_trimmed)
                 continue
 
-            per_clip_dur = target_dur / len(clip_paths)
+            per_clip_dur = target_dur / len(clip_paths) if len(clip_paths) > 0 else target_dur
             for j, cp in enumerate(clip_paths):
                 clip_dur = self.editor.get_duration(cp)
                 if clip_dur is None:
@@ -422,16 +740,70 @@ class VideoPipeline:
                     seg_trimmed.append(cp)
             trimmed_segments.append(seg_trimmed)
 
-        # ---- Step 6: concat B-roll ----
-        logger.info("[F:%s] Step 6: 拼接B-roll画面...", video_id)
+        # ---- Step 5.5: assemble per-segment videos + floating corner titles ----
+        logger.info("[F:%s] Step 5.5: 逐段拼合 + 浮动标题...", video_id)
+        segment_videos: list[str] = []
+        for i, (clips, _target_dur) in enumerate(zip(trimmed_segments, segment_durations)):
+            seg = segments[i]
+            topic = seg.get("topic", "")
+            is_opening = "开场" in topic or "概述" in topic
+            is_closing = "结尾" in topic or "总结" in topic
+
+            if len(clips) == 0:
+                continue  # opening / closing / placeholder handled in step 5
+
+            # Combine segment clips with short intra-segment transitions
+            seg_raw = str(video_dir / f"seg_raw_{i:02d}.mp4")
+            if len(clips) == 1:
+                import shutil as _sh
+                _sh.copy(clips[0], seg_raw)
+            else:
+                self.editor.concat_with_transitions(clips, seg_raw, transition="fadeblack", duration=0.3)
+
+            # Add floating news headline for real news segments
+            if not is_opening and not is_closing:
+                topic_clean = re.sub(r'^消息[一二三四五六七八九十\d]+[：:\s]*', '', topic).strip()
+                if not topic_clean:
+                    topic_clean = topic
+                seg_titled = str(video_dir / f"seg_titled_{i:02d}.mp4")
+                ok = self.editor.add_text_overlay(seg_raw, seg_titled, topic_clean)
+                if ok:
+                    segment_videos.append(seg_titled)
+                    logger.info("[F:%s]   段%d [%s]: 浮动标题已叠加", video_id, i, topic_clean)
+                else:
+                    segment_videos.append(seg_raw)
+                    logger.warning("[F:%s]   段%d [%s]: 标题叠加失败，使用原画面", video_id, i, topic_clean)
+            # Non-news segments (opening/closing) are handled directly in all_broll;
+            # do NOT add them to segment_videos, which would offset news indexing.
+
+        # Build final clip list: cards (opening/closing/placeholder) + segment videos
         all_broll: list[str] = []
-        for clips in trimmed_segments:
-            all_broll.extend(clips)
+        seg_vid_idx = 0
+        for i, clips in enumerate(trimmed_segments):
+            if len(clips) == 0:
+                continue  # these don't contribute clips (unexpected)
+            seg = segments[i]
+            topic = seg.get("topic", "")
+            is_non_news = "开场" in topic or "概述" in topic or "结尾" in topic or "总结" in topic
+            if is_non_news:
+                all_broll.extend(clips)  # title card / closing card / placeholder → 1 clip
+            else:
+                if seg_vid_idx < len(segment_videos):
+                    all_broll.append(segment_videos[seg_vid_idx])
+                    seg_vid_idx += 1
+                else:
+                    all_broll.extend(clips)  # fallback: raw clips
+
+        # ---- Step 6: concat segment videos ----
+        logger.info("[F:%s] Step 6: 拼接各段视频...", video_id)
         if not all_broll:
             raise RuntimeError("无可用B-roll素材！")
 
         raw_video = str(video_dir / "raw_broll.mp4")
-        ok = self.editor.concat(all_broll, raw_video, audio=False)
+        ok = self.editor.concat_with_transitions(
+            all_broll, raw_video, transition="fadeblack", duration=0.6)
+        if not ok:
+            ok = self.editor.concat(all_broll, raw_video, audio=False)
         if not ok:
             raise RuntimeError("B-roll拼接失败")
 
@@ -494,6 +866,21 @@ class VideoPipeline:
         else:
             shutil.copy(current_video, final_path)
 
+        # ---- Final re-encode: keyframes + faststart for smooth seeking ----
+        final_seekable = str(video_dir / f"{vtype}_{vdate.isoformat()}_final.mp4")
+        if self.editor.reencode_final(final_path, final_seekable):
+            final_path = final_seekable
+            logger.info("[F:%s] 最终编码优化完成 (keyframe+faststart)", video_id)
+
+        # ---- Generate cover: take a frame from the video ----
+        cover_path = str(video_dir / "cover.jpg")
+        try:
+            self.editor.extract_frame(final_path, cover_path, time_sec=3)
+            logger.info("[F:%s] 封面抽帧: %s", video_id, cover_path)
+        except Exception:
+            logger.exception("[F:%s] 封面抽帧失败，跳过", video_id)
+            cover_path = ""
+
         # ---- Save metadata (upsert: works for both HTTP and local runs) ----
         meta = json.dumps({
             "segments": len(segments),
@@ -503,16 +890,17 @@ class VideoPipeline:
             "tts": "edge-tts (zh-CN-XiaoyiNeural)",
             "subtitles": "script-based (zero-typo)",
             "intro_bg": "pexels" if intro_bg else "gradient",
+            "cover_path": cover_path,
         })
         await pool.execute(
             "INSERT INTO videos (id, type, date, status, script, title, metadata, duration_seconds, output_path) "
             "VALUES ($1, $2, $3, 'done', $4, $5, $6, $7, $8) "
-            "ON CONFLICT (type, date) DO UPDATE SET "
-            "id = $1, status = 'done', script = $4, title = $5, metadata = $6, "
+            "ON CONFLICT (id) DO UPDATE SET "
+            "status = 'done', script = $4, title = $5, metadata = $6, "
             "duration_seconds = $7, output_path = $8, finished_at = now()",
             video_id, vtype, vdate,
             script_text,
-            f"AI智能体早报 — {today}",
+            f"{_get_domain_config()['display']}早报 — {today}",
             meta,
             round(total_duration),
             final_path,
@@ -534,42 +922,58 @@ class VideoPipeline:
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def _fetch_real_news() -> list[dict]:
-    """Fetch real AI/agent news from RSS sources (no DB required)."""
+    """Fetch real news from RSS sources based on _VIDEO_DOMAIN."""
     try:
         from scrapers.rss import fetch_single_rss, RSS_SOURCES, to_raw_items
     except ImportError:
         logger.warning("无法导入 module-a RSS 模块")
         return []
 
-    ai_sources = [s for s in RSS_SOURCES if s.get("category") == "科技"]
+    # Map domain to RSS category via domain config
+    dc = _get_domain_config()
+    category = dc.get("category", "科技")
+    sources = [s for s in RSS_SOURCES if s.get("category") == category]
+    is_fallback_sources = False
+    if not sources:
+        sources = [s for s in RSS_SOURCES if s.get("category") == "科技"]  # fallback
+        is_fallback_sources = True
+
     batch_id = _uuid.uuid4()
     since = datetime.now(timezone.utc) - timedelta(hours=36)
 
-    tasks = [fetch_single_rss(src) for src in ai_sources]
+    tasks = [fetch_single_rss(src) for src in sources]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     all_entries = []
     for i, result in enumerate(results):
-        source_name = ai_sources[i]["name"]
+        source_name = sources[i]["name"]
         if isinstance(result, Exception):
             logger.warning("RSS [%s] 失败: %s", source_name, result)
             continue
         for entry in result:
             entry["_source_name"] = source_name
-            entry["_category"] = "科技"
+            entry["_category"] = dc.get("category", "科技")
         all_entries.extend(result)
 
     filtered = [e for e in all_entries if _rss_entry_time(e) >= since]
     raw_items = to_raw_items(filtered, "rss", batch_id)
-    logger.info("RSS抓取: %d 条科技新闻", len(raw_items))
+    logger.info("RSS抓取: %d 条%s新闻 (来源类别=%s)", len(raw_items), dc["display"], category)
 
-    arxiv_items = await _fetch_arxiv_news(batch_id)
-    logger.info("arXiv抓取: %d 篇AI论文", len(arxiv_items))
-    raw_items.extend(arxiv_items)
+    # Always apply domain filter when using fallback sources or for 科技 category.
+    # For custom domains (e.g. 量子计算), this filters out irrelevant tech news.
+    if category == "科技" or is_fallback_sources:
+        arxiv_items = await _fetch_arxiv_news(batch_id)
+        logger.info("arXiv抓取: %d 篇论文", len(arxiv_items))
+        raw_items.extend(arxiv_items)
+        raw_items = _filter_domain_news(raw_items)
+        logger.info("领域过滤后: %d 条%s相关新闻", len(raw_items), dc["display"])
 
-    ai_items = _filter_ai_news(raw_items)
-    logger.info("AI筛选后: %d 条Agent相关新闻", len(ai_items))
-    return ai_items[:15]
+    # If after filtering we have too few or zero items, let DeepSeek use its own knowledge
+    if len(raw_items) == 0:
+        logger.info("无%s相关新闻，将使用DeepSeek知识生成脚本", dc["display"])
+        return []
+
+    return raw_items[:15]
 
 
 async def _fetch_arxiv_news(batch_id) -> list[dict]:
@@ -650,37 +1054,35 @@ def _rss_entry_time(entry: dict) -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _filter_ai_news(items: list[dict]) -> list[dict]:
-    """Filter news by the 14-tag system used by module-b scoring.
+def _filter_domain_news(items: list[dict]) -> list[dict]:
+    """Filter news by domain relevance using config-driven keyword scoring.
 
-    Tags: LLM, Agent, 开源, 工具, 科技, 行业, 全球, 体育, 安全, 芯片, 机器人, 自动驾驶, 融资, 医疗
-
-    Agent-related content gets priority scoring, but all 14 tag categories
-    are eligible so that the video tags match the actual news tags.
+    Uses the active domain's prompt_context to build dynamic keyword matchers.
+    Falls back to the 14-tag system for preset domains. For custom keywords,
+    builds matching keywords from the domain name and prompt_context.
     """
-    # Core Agent keywords (highest priority — matches "Agent" tag)
-    agent_core = [
-        "agent", "智能体", "agentic", "自主", "multi-agent", "多智能体", "多agent",
-        "桌面智能", "desktop agent", "电脑操控", "电脑操作", "computer use",
-        "gui自动化", "gui automation", "浏览器智能体", "browser agent",
-        "编程智能体", "coding agent", "代码agent", "办公智能体", "办公agent",
-        "工具调用", "function call", "tool use", "任务规划", "task planning",
-        "自主执行", "工作流自动化", "workflow automation", "mcp", "model context protocol",
-        "a2a", "agent-to-agent",
-    ]
+    dc = _get_domain_config()
+    domain_label = dc["label"]
 
-    agent_products = [
-        "openhuman", "openclaw", "dumate", "genflow", "crewai", "autogpt",
-        "babyagi", "agentgpt", "copilot", "cursor", "windsurf", "devin",
-        "manus", "aionui", "echobot", "superpowers", "claude code",
-        "gemini agent", "copilot studio", "langgraph", "langflow", "dify",
-        "coze", "扣子", "百炼", "元器",
-    ]
+    # Domain-specific keywords from config
+    agent_core = dc.get("agent_core", [])
+    agent_products = dc.get("agent_products", [])
+
+    # Build domain-specific context keywords from prompt_context
+    prompt_ctx = dc.get("prompt_context", domain_label)
+    # Split by Chinese/English punctuation to get individual topic words
+    domain_topics = set()
+    for part in re.split(r'[、，,；;。.\s]+', prompt_ctx):
+        part = part.strip()
+        if part and len(part) >= 2:
+            domain_topics.add(part.lower())
+    # Also add the domain label itself
+    domain_topics.add(domain_label.lower())
 
     # 14-tag keyword mapping — aligns with module-b/ai/analyzer.py _KEYWORD_TAG_MAP
     tag_keywords = {
         "LLM":    ["llm", "大模型", "gpt", "claude", "gemini", "文心", "星火", "通义", "deepseek", "深度求索"],
-        "Agent":  [],  # covered by agent_core + agent_products above
+        "Agent":  [],
         "开源":    ["开源", "open source", "github", "gitlab", "apache", "mit license"],
         "工具":    ["工具", "tool", "插件", "plugin", "sdk", "api", "框架", "framework"],
         "科技":    ["科技", "tech", "发布", "推出", "新产品", "功能更新", "版本发布"],
@@ -695,12 +1097,7 @@ def _filter_ai_news(items: list[dict]) -> list[dict]:
         "医疗":    ["医疗", "医学", "health", "药物", "临床", "诊断", "基因", "蛋白质", "疫苗"],
     }
 
-    agent_context = [
-        "编程助手", "代码助手", "ai编程",
-        "自动化", "automation", "自主操作",
-    ]
-
-    # Hard exclude: content that should never appear in a tech news video
+    # Hard exclude: content that should never appear in a news video
     hard_exclude = [
         "广告", "推广", "课程", "培训", "退费", "报名",
     ]
@@ -715,9 +1112,12 @@ def _filter_ai_news(items: list[dict]) -> list[dict]:
         if any(kw in text for kw in hard_exclude):
             continue
 
+        # Product/core keyword scoring (from domain config, if configured)
         product_score = sum(5 for kw in agent_products if kw in text)
         core_score = sum(3 for kw in agent_core if kw in text)
-        ctx_score = sum(1 for kw in agent_context if kw in text)
+
+        # Domain topic scoring: match against domain_topics from prompt_context
+        domain_topic_score = sum(2 for dt in domain_topics if dt in text)
 
         # Score by 14-tag keyword match (1pt per tag hit)
         tag_score = 0
@@ -727,15 +1127,14 @@ def _filter_ai_news(items: list[dict]) -> list[dict]:
                 tag_score += 2
                 matched_tags.append(tag)
 
-        # If no Agent signal AND no tag match at all, skip
-        if product_score == 0 and core_score == 0 and tag_score == 0:
-            continue
+        # For custom domains (no agent_core/products), rely on domain_topic_score + tag_score
+        total = product_score + core_score + domain_topic_score + tag_score
 
-        total = product_score + core_score + ctx_score + tag_score
+        # Threshold: lower for custom domains, standard for preset domains
+        has_preset_config = bool(agent_core or agent_products)
+        threshold = 5 if has_preset_config else 2
 
-        # Lower threshold for tag-matched news (was >= 5, now >= 3 for tag-matched)
-        if total >= 3:
-            # Attach matched tags so the script prompt can use them
+        if total >= threshold:
             item["_matched_tags"] = matched_tags
             scored.append((total, item))
 
@@ -769,92 +1168,73 @@ async def _generate_news_script(today: str, news_items: list[dict] | None = None
         news_context = "\n\n".join(lines)
 
     if news_context:
-        prompt = f"""你是AI/科技领域的专业新闻主播。下方是最近24小时的科技新闻素材。
-
-⚠️ 分类标签体系（与新闻评分系统一致，BROLL必须使用这些标签）：
-  LLM（大模型相关）、Agent（智能体）、开源、工具、科技、行业、
-  全球、体育、安全、芯片、机器人、自动驾驶、融资、医疗
-
-✅ 优先报道的领域（对应标签）：
-  1. Agent / 智能体: 桌面智能体、编程智能体、办公智能体、多智能体协作、MCP协议等
-  2. LLM / 大模型: 新模型发布、API更新、推理优化、开源模型
-  3. 开源 / 工具: GitHub热门项目、开发框架、AI编程工具、新SDK
-  4. 科技: 重大产品发布、技术突破、AI应用落地
-  5. 芯片 / 机器人 / 自动驾驶 / 融资: 重要进展也可报道
-
-❌ 绝对禁止：
-  - 广告/营销/课程推广/培训
-  - 游戏/娱乐/综艺/美食/旅游等非科技内容
-  - 股票理财/荐股/资金盘等金融诈骗
-
-⚠️ 选择标准：
-  - 优先选择 Agent + LLM 相关的新闻（至少2条）
-  - 其他标签的新闻选最有价值的1-2条
-  - 如果新闻不够4条 → 有几条报几条，不编造
+        dc = _get_domain_config()
+        display = dc["display"]
+        prompt = f"""你是{display}领域的专业新闻主播。下方是最近24小时的新闻素材。
 
 ⚠️ 核心铁律：
 1. 必须基于上方提供的真实新闻，绝对不要编造
-2. 这是新闻播报，不是科普教程
-3. 严禁任何Markdown格式，纯文本口播稿
-4. 中文TTS无法朗读英文 → 所有英文必须用中文表达
-5. 严禁出现任何URL网址
+2. 标题≤15字，简洁有力
+3. 每条新闻=事件句+意义句，各一句
+4. 不同公司/实体，禁止同一公司出现两次
+5. 中文TTS无法朗读英文 → 所有英文用中文表达
+6. 严禁Markdown、URL、过渡词
 
-⚠️ 结构铁律：
-【开场概述】→ N条新闻 → 【结尾总结】，N=3~5
+⚠️ 结构铁律：【开场引导】→ 4-5条新闻 → 无结尾
 
-⚠️ BROLL铁律（搜索关键词，2-5个中文词）：
-- BROLL必须是新闻核心实体 + 对应标签名
-- 例如: Agent新闻 → "OpenHuman 智能体 Agent"
-- 例如: LLM新闻 → "深度求索 大模型 LLM"
-- 例如: 开源新闻 → "GitHub开源 编程工具"
-- 严禁占位符如"搜索关键词"、"此处填写"
+格式（必须严格复制！【新闻N：】前缀不可省略！）：
+【开场引导】
+欢迎收看{today} {display}早报。
+BROLL: {dc["broll_fallback"]}
 
-格式示例：
-【开场概述】
-各位观众早上好，欢迎收看今天的AI科技早报。今天我们将聚焦...
-BROLL: AI科技 智能体 Agent
+【新闻一：≤15字标题】
+事件句.简要背景或影响.
+BROLL: <公司/实体名> <关键词>
 
-【新闻一：<具体标题，包含标签提示>】
-...（新闻内容）...
-BROLL: <核心实体> <对应标签>
+【新闻二：≤15字标题】
+事件句.简要背景或影响.
+BROLL: <公司/实体名> <关键词>
 
-今日科技新闻素材：
-{news_context}
+【新闻三：≤15字标题】
+事件句.简要背景或影响.
+BROLL: <公司/实体名> <关键词>
 
-⚠️ 输出前请自检：
-1. 每条新闻是否标注了正确的分类标签？
-2. BROLL关键词是否包含标签名？总字数600-1000字。"""
+【新闻四：≤15字标题】
+事件句.简要背景或影响.
+BROLL: <公司/实体名> <关键词>
+
+【新闻五：≤15字标题】
+事件句.简要背景或影响.
+BROLL: <公司/实体名> <关键词>
+
+总字数250-350字。
+
+今日新闻素材：
+{news_context}"""
     else:
-        prompt = f"""你是AI/科技领域的专业新闻主播。今天（{today}）没有实时新闻素材，请基于你的知识撰写AI科技领域的早报解说词。
+        dc = _get_domain_config()
+        display = dc["display"]
+        prompt_ctx = dc.get("prompt_context", display)
+        prompt_focus = dc.get("prompt_focus", "")
+        focus_block = f"\n重点关注领域：{prompt_focus}" if prompt_focus else ""
+        prompt = f"""你是{display}领域的专业新闻主播。今天（{today}）没有实时新闻素材，请基于你的知识撰写{display}早报解说词。
 
-⚠️ 分类标签体系（BROLL必须使用这些标签）：
-  LLM（大模型）、Agent（智能体）、开源、工具、科技
+可覆盖的主题领域：{prompt_ctx}{focus_block}
 
-✅ 报道领域（3-4条）：
-  - Agent / 智能体: 桌面智能体、编程智能体、办公智能体、多智能体协作
-  - LLM / 大模型: 新模型、推理优化、开源模型
-  - 开源 / 工具: AI编程工具、开发框架、GitHub热门项目
-  - 科技: 重大产品发布、技术突破
+格式（必须严格复制！【新闻N：】前缀不可省略！）：
+【开场引导】
+欢迎收看{today}{display}早报。
+BROLL: {dc["broll_fallback"]}
 
-❌ 禁止报道：广告营销、游戏娱乐、理财股票、非科技内容
+【新闻一：具体标题示例】
+一句话事件。一句话意义。
+BROLL: 公司名 关键词
 
-这是新闻播报，不是科普教程。语言专业简洁有新闻感，适合口播。
-严禁Markdown格式，纯文本口播稿。所有英文必须用中文表达。
+【新闻二：具体标题示例】
+一句话事件。一句话意义。
+BROLL: 公司名 关键词
 
-格式（【】括号标记，3-4条新闻）：
-【开场概述】
-...
-BROLL: AI科技 智能体 Agent
-
-【新闻一：<标题，含标签提示>】
-...
-BROLL: <核心实体> <对应标签>
-
-【结尾总结】
-...
-BROLL: AI科技
-
-BROLL铁律：2-5个中文词，必须包含对应标签名。总字数600-1000字。"""
+4-5条新闻，无结尾。总字数250-350字。"""
 
     try:
         client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
@@ -887,17 +1267,18 @@ def _parse_script(raw: str, today: str) -> tuple[str, list[dict]]:
     broll_old = re.compile(r'<!--BROLL:\s*(.+?)-->')
 
     def _extract_broll(text: str) -> tuple[str | None, str]:
+        broll_fb = _get_domain_config()["broll_fallback"]
         m = broll_new.search(text)
         if m:
             kw = m.group(1).strip()
             if kw in ("搜索关键词", "此处填写", "替换为", "在此填写", "实际搜索词", "搜索词"):
-                return "AI 科技新闻", broll_new.sub("", text)
+                return broll_fb, broll_new.sub("", text)
             return kw, broll_new.sub("", text)
         m = broll_old.search(text)
         if m:
             kw = m.group(1).strip()
             if kw in ("搜索关键词", "此处填写", "替换为", "在此填写", "实际搜索词", "搜索词"):
-                return "AI 科技新闻", broll_old.sub("", text)
+                return broll_fb, broll_old.sub("", text)
             return kw, broll_old.sub("", text)
         return None, text
 
@@ -912,7 +1293,7 @@ def _parse_script(raw: str, today: str) -> tuple[str, list[dict]]:
                 content = parts[i + 1] if i + 1 < len(parts) else ""
                 broll_keywords, content = _extract_broll(content)
                 if broll_keywords is None:
-                    broll_keywords = "AI 科技新闻"
+                    broll_keywords = _get_domain_config()["broll_fallback"]
                 content = content.strip()
                 if not content:
                     continue
@@ -950,7 +1331,7 @@ def _parse_script(raw: str, today: str) -> tuple[str, list[dict]]:
         if opening_text and len(opening_text) > 20:
             opening_broll, opening_text = _extract_broll(opening_text)
             if opening_broll is None:
-                opening_broll = "AI 科技新闻"
+                opening_broll = _get_domain_config()["broll_fallback"]
             clean_lines.append(opening_text)
             segments.append({"topic": "开场概述", "text": opening_text.strip(), "broll_keywords": opening_broll})
 
@@ -963,7 +1344,7 @@ def _parse_script(raw: str, today: str) -> tuple[str, list[dict]]:
             body = block[first_line_end:].strip() if first_line_end > 0 else ""
             broll_keywords, body = _extract_broll(body)
             if broll_keywords is None:
-                broll_keywords = "AI 科技新闻"
+                broll_keywords = _get_domain_config()["broll_fallback"]
             spoken = first_line + "\n" + body if body else first_line
             clean_lines.append(raw_title)
             clean_lines.append(spoken.strip())
@@ -975,7 +1356,7 @@ def _parse_script(raw: str, today: str) -> tuple[str, list[dict]]:
         if closing_text and len(closing_text) > 20:
             closing_broll, closing_text = _extract_broll(closing_text)
             if closing_broll is None:
-                closing_broll = "AI 科技新闻"
+                closing_broll = _get_domain_config()["broll_fallback"]
             clean_lines.append("结尾总结")
             clean_lines.append(closing_text.strip())
             segments.append({"topic": "结尾总结", "text": closing_text.strip(), "broll_keywords": closing_broll})
@@ -987,38 +1368,29 @@ def _parse_script(raw: str, today: str) -> tuple[str, list[dict]]:
     text = raw.strip()
     single_broll, text = _extract_broll(text)
     if single_broll is None:
-        single_broll = "AI 人工智能 科技新闻"
-    segments.append({"topic": "AI智能体早报", "text": text.strip(), "broll_keywords": single_broll})
+        single_broll = _get_domain_config()["broll_fallback"]
+    segments.append({"topic": f"{_get_domain_config()['display']}早报", "text": text.strip(), "broll_keywords": single_broll})
     return "\n".join(clean_lines) if clean_lines else text, segments
 
 
 def _fallback_script(today: str) -> tuple[str, list[dict]]:
-    """Fallback Agent-only news script when DeepSeek is unavailable."""
-    script = f"""【开场概述】
-各位观众早上好，欢迎收看{today}AI智能体领域早报。今天我们将聚焦桌面智能体、编程智能体和办公智能体的最新进展。
-BROLL: AI智能体 Agent
+    """Fallback domain news script when DeepSeek is unavailable."""
+    dc = _get_domain_config()
+    display = dc["display"]
+    broll_fb = dc.get("broll_fallback", display)
+    script = f"""【开场引导】
+欢迎收看{today}{display}早报。今天我们将关注{display}领域的最新进展和重要动态。
+BROLL: {broll_fb}
 
-【新闻一：开源桌面智能体OpenHuman引爆GitHub】
-开源桌面AI智能体OpenHuman在GitHub上连续霸榜，6天内从三千余星飙升至近两万星。这款运行在用户桌面上的智能体能直接辅助完成日常电脑操作，其爆发式增长反映了开发者对本地化、可操控AI助手的强烈需求。
-BROLL: OpenHuman 桌面智能体 GitHub
+【新闻一：今日{display}领域快讯】
+今日{display}领域有多项值得关注的动态，产业各方积极布局推动技术落地应用.
+BROLL: {broll_fb}
 
-【新闻二：百度智能云办公智能体DuMate实测表现亮眼】
-百度针对企业场景设计的桌面级AI智能体DuMate全量上线后，科技媒体对其实际办公能力进行了深度测评。结果显示DuMate在真实办公场景中表现出色，能有效完成多形态输出任务，被评价为真正能"抗活儿"的AI办公搭档。
-BROLL: 百度 DuMate 办公智能体
-
-【新闻三：本地AI智能体框架OpenClaw补齐操控能力】
-本地AI智能体框架OpenClaw正式上线桌面操控工具Peekaboo，提供像素级截图、界面元素识别和完整GUI自动化能力。这标志着本地智能体在自主操控电脑方面迈出了关键一步。
-BROLL: OpenClaw 桌面操控 GUI自动化
-
-【新闻四：开源多智能体框架CrewAI获千万美元融资】
-开源多智能体协作框架CrewAI完成A轮融资，估值突破两亿美元。该框架支持多个AI智能体角色扮演和任务分工，已被上千家企业用于自动化工作流搭建。
-BROLL: CrewAI 多智能体 开源框架
-
-【结尾总结】
-以上就是今天的AI智能体领域早报。从桌面智能体的爆发到办公智能体的落地验证，AI智能体正在从概念走向真正的日常工具。感谢您的收看。
-BROLL: AI智能体 Agent"""
+【新闻二：行业趋势观察】
+{display}技术持续发展，产业生态不断演进，多家企业推出创新方案加速行业变革.
+BROLL: {broll_fb}"""
     text, segments = _parse_script(script, today)
-    logger.info("使用Agent模板脚本: %d 字, %d 段", len(script), len(segments))
+    logger.info("使用%s模板脚本: %d 字, %d 段", display, len(script), len(segments))
     return text, segments
 
 
@@ -1026,8 +1398,9 @@ BROLL: AI智能体 Agent"""
 # B-roll relevance scoring (domain gate + keyword overlap)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Irrelevant domains — these clips should NEVER be used as AI news B-roll
-DOMAIN_IRRELEVANT = {
+# Always-irrelevant domains — these clips should NEVER be used as B-roll
+# regardless of the active domain.  Entertainment, ads, scams, etc.
+DOMAIN_ALWAYS_IRRELEVANT = {
     "音乐", "歌曲", "MV", "翻唱", "演唱会", "歌手", "乐队", "专辑",
     "QQ音乐", "酷狗", "网易云", "唱吧", "全民K歌", "抖音神曲",
     "游戏", "电竞", "王者荣耀", "英雄联盟", "原神", "崩坏", "星穹铁道",
@@ -1036,7 +1409,7 @@ DOMAIN_IRRELEVANT = {
     "Steam", "switch", "PS5", "Xbox",
     "综艺", "搞笑", "鬼畜", "恶搞", "整蛊", "脱口秀", "相声", "小品",
     "真人秀", "选秀", "练习生", "女团", "男团", "偶像",
-    "美食", "探店", "旅游", "美妆", "穿搭", "减肥", "健身", "瑜伽",
+    "美食", "探店", "美妆", "穿搭", "减肥", "瑜伽",
     "星座", "塔罗", "占卜", "宠物", "萌宠", "钓鱼", "手工", "绘画",
     "书法", "舞蹈", "翻跳", "广场舞",
     "相亲", "恋爱", "婚姻", "育儿", "母婴",
@@ -1044,7 +1417,7 @@ DOMAIN_IRRELEVANT = {
     "股票", "基金", "期货", "彩票", "荐股", "涨停", "跌停",
     "直播带货", "秒杀", "优惠券", "拼多多", "抽奖", "开箱",
     "电影", "电视剧", "网剧", "动漫", "番剧", "追番", "剧情",
-    # === 广告/营销/商业推广（新增）===
+    # Ads / scams / commercial
     "课程", "培训", "退费", "退款", "报名", "网课", "培训班", "训练营",
     "赚钱", "副业", "月入", "暴富", "躺赚", "薅羊毛", "返利",
     "理财", "炒股", "私募", "炒币", "资金盘", "传销", "加盟", "代理",
@@ -1054,7 +1427,19 @@ DOMAIN_IRRELEVANT = {
     "算命", "风水", "星座运势", "塔罗牌",
 }
 
-DOMAIN_TECH = {
+# Domain-specific irrelevant keywords: per-domain overrides.
+# Each domain can have its own "irrelevant" list that supplements
+# DOMAIN_ALWAYS_IRRELEVANT.  Keys match domain labels.
+DOMAIN_IRRELEVANT_OVERRIDES: dict[str, set[str]] = {
+    # For sports domain, "健身" and "旅游" are actually relevant
+    "体育": {"健身", "旅游"},
+    # For medical domain, "健身" could be relevant (health/fitness)
+    "医疗": {"健身"},
+}
+
+# Previously DOMAIN_TECH — now built dynamically from domain config.
+# Keep as fallback for when no domain config is available.
+_DOMAIN_TECH_FALLBACK = {
     "编程", "代码", "开发", "开源", "AI", "人工智能", "机器学习",
     "深度学习", "大模型", "LLM", "Agent", "智能体", "模型训练",
     "推理", "部署", "API", "SDK", "框架", "工具链", "算力",
@@ -1067,6 +1452,66 @@ DOMAIN_TECH = {
     "HuggingFace", "OpenAI", "DeepSeek", "Anthropic", "Claude",
     "Copilot", "Cursor", "终端", "命令行", "vim", "neovim",
 }
+
+
+def _build_domain_context() -> set[str]:
+    """Build a set of domain-relevant keywords from the active domain config.
+
+    Used by _score_clip_relevance to identify relevant clips for the
+    current domain (replaces the old hardcoded DOMAIN_TECH).
+    """
+    dc = _get_domain_config()
+    keywords: set[str] = set()
+
+    # 1. Domain label + display name
+    keywords.add(dc["label"].lower())
+    keywords.add(dc["display"].lower())
+
+    # 2. From prompt_context: split by punctuation to get topic words
+    prompt_ctx = dc.get("prompt_context", "")
+    for part in re.split(r'[、，,；;。.\s]+', prompt_ctx):
+        part = part.strip().lower()
+        if part and len(part) >= 2:
+            keywords.add(part)
+
+    # 3. From broll_fallback: split by spaces
+    broll_fb = dc.get("broll_fallback", "")
+    for part in broll_fb.split():
+        part = part.strip().lower()
+        if part and len(part) >= 2:
+            keywords.add(part)
+
+    # 4. From agent_core / agent_products if configured
+    for kw in dc.get("agent_core", []):
+        if kw and len(kw) >= 2:
+            keywords.add(kw.lower())
+    for kw in dc.get("agent_products", []):
+        if kw and len(kw) >= 2:
+            keywords.add(kw.lower())
+
+    # 5. Fallback: if no keywords were built, use the tech fallback + domain label
+    if len(keywords) <= 2:
+        keywords.update(_DOMAIN_TECH_FALLBACK)
+
+    return keywords
+
+
+def _build_domain_irrelevant() -> set[str]:
+    """Build the irrelevant keyword set for the active domain.
+
+    Starts from DOMAIN_ALWAYS_IRRELEVANT, then removes any keywords
+    that the current domain considers relevant (from DOMAIN_IRRELEVANT_OVERRIDES).
+    """
+    dc = _get_domain_config()
+    domain_label = dc["label"]
+
+    irr = set(DOMAIN_ALWAYS_IRRELEVANT)
+
+    # Remove domain-specific overrides (keywords that ARE relevant for this domain)
+    overrides = DOMAIN_IRRELEVANT_OVERRIDES.get(domain_label, set())
+    irr -= overrides
+
+    return irr
 
 _AMBIGUOUS_TOKENS = {
     "桌面", "布局", "系统", "设置", "界面", "窗口", "菜单",
@@ -1090,7 +1535,17 @@ _STOPWORDS = {
 
 
 def _score_clip_relevance(clips: list[dict], topic_text: str) -> list[tuple[dict, int]]:
-    """Score B站 clips by domain relevance + keyword overlap with news topic."""
+    """Score B站/Pexels clips by domain relevance + keyword overlap with news topic.
+
+    Domain-aware: builds domain context keywords from the active domain config
+    and uses them for both clip classification (relevant vs irrelevant) and
+    content scoring.  Pre-computes keyword sets once for efficiency.
+    """
+    # ── Pre-compute domain context once ──
+    _DOMAIN_CONTEXT = _build_domain_context()
+    _DOMAIN_IRRELEVANT = _build_domain_irrelevant()
+
+    # ── Tokenize topic text ──
     mid = min(40, len(topic_text) // 2)
     head_text = topic_text[:mid]
     tail_text = topic_text[mid:]
@@ -1109,32 +1564,45 @@ def _score_clip_relevance(clips: list[dict], topic_text: str) -> list[tuple[dict
         for m in re.finditer(r'[A-Za-z][A-Za-z0-9.+]{2,}', head_text)
     }
 
+    # ── Clip classification: domain-relevant vs irrelevant ──
     def _classify_domain(title: str, desc: str) -> tuple[str, int, list]:
+        """Classify clip as 'relevant', 'neutral', or 'irrelevant'.
+
+        Uses the dynamic _DOMAIN_CONTEXT instead of hardcoded DOMAIN_TECH.
+        A clip is 'relevant' if it matches domain context keywords.
+        It's 'irrelevant' only if it matches always-irrelevant keywords
+        AND has NO domain context match.
+        """
         content = title + " " + desc
         content_lower = content.lower()
-        irr_hits = [kw for kw in DOMAIN_IRRELEVANT if kw.lower() in content_lower]
-        tech_hits = [kw for kw in DOMAIN_TECH if kw.lower() in content_lower]
 
-        if irr_hits and not tech_hits:
+        irr_hits = [kw for kw in _DOMAIN_IRRELEVANT if kw.lower() in content_lower]
+        domain_hits = [kw for kw in _DOMAIN_CONTEXT if kw.lower() in content_lower]
+
+        if irr_hits and not domain_hits:
             return ("irrelevant", -100, irr_hits)
-        if irr_hits and tech_hits:
+        if irr_hits and domain_hits:
+            # Has both: check if the primary signal (title) is irrelevant
             title_lower = title.lower()
             title_irr = [kw for kw in irr_hits if kw.lower() in title_lower]
             if title_irr:
                 return ("irrelevant", -100, title_irr)
             return ("neutral", 0, [])
-        if tech_hits:
-            return ("tech", 0, [])
+        if domain_hits:
+            return ("relevant", 0, [])
         return ("neutral", 0, [])
 
+    # ── Keyword overlap scoring ──
     def _score_overlap(clip_title: str, clip_desc: str) -> int:
         content = clip_title + " " + clip_desc
         score = 0
 
+        # English entities: strong signal (20 pts each)
         for ent in eng_entities:
             if ent in content.lower():
                 score += 20
 
+        # Head tokens (most specific, highest weight)
         specific_head = head_tokens - _AMBIGUOUS_TOKENS
         ambiguous_head = head_tokens & _AMBIGUOUS_TOKENS
         specific_tail = tail_tokens - _AMBIGUOUS_TOKENS
@@ -1150,18 +1618,25 @@ def _score_clip_relevance(clips: list[dict], topic_text: str) -> list[tuple[dict
                 if t in content:
                     score += 3
 
-        _AI_CONTEXT = {
-            "AI", "人工智能", "大模型", "智能体", "深度学习", "机器学习",
-            "神经网络", "自然语言", "计算机视觉", "机器人", "自动驾驶",
-            "编程", "代码", "开源", "Agent", "Copilot", "LLM",
-            "推理", "训练", "模型", "算法",
-        }
-        ai_hits = sum(1 for t in _AI_CONTEXT if t in content)
-        if ai_hits > 0:
-            score += ai_hits * 5
+        # Domain context hits: boost for clips matching the active domain
+        domain_hits = sum(1 for t in _DOMAIN_CONTEXT if t.lower() in content.lower())
+        if domain_hits > 0:
+            score += domain_hits * 8  # was 5, increased for better relevance
+
+        # Entity alias hits: check if known entities from topic appear in clip
+        topic_entities = set()
+        for entity in _ENTITY_ALIASES:
+            if entity.lower() in head_text.lower():
+                topic_entities.add(entity.lower())
+        for ent in topic_entities:
+            aliases = _get_entity_aliases(ent)
+            for alias in aliases:
+                if alias.lower() in content.lower():
+                    score += 10  # strong signal: entity match
 
         return score
 
+    # ── Score each clip ──
     scored: list[tuple[dict, int]] = []
     for clip in clips:
         title = clip.get("title", "") or ""
@@ -1169,20 +1644,26 @@ def _score_clip_relevance(clips: list[dict], topic_text: str) -> list[tuple[dict
         content = title + " " + desc
         view_count = clip.get("view_count", 0) or 0
 
-        domain, penalty, irr_hits = _classify_domain(title, desc)
-        if domain == "irrelevant":
+        domain_label, penalty, irr_hits = _classify_domain(title, desc)
+        if domain_label == "irrelevant":
             scored.append((clip, -100))
             continue
 
         score = _score_overlap(title, desc)
 
+        # Domain-relevant clips get a baseline boost
+        if domain_label == "relevant":
+            score += 5
+
+        # Tutorial / course penalty
         if re.search(r'教程|从零开始|全套|合集|入门到精通|零基础|速成', content):
             score -= 5
+        # Hashtag spam penalty
         hashtag_count = content.count('#')
         if hashtag_count > 10:
             score -= 5
 
-        # === Ad / commercial penalty (新增) ===
+        # Ad / commercial penalty
         _AD_PATTERNS = [
             r'课程|培训|退费|退款|报名|试听|网课|培训班|训练营',
             r'赚钱|副业|月入\d|暴富|躺赚|薅羊毛|返利|优惠券',
@@ -1193,8 +1674,9 @@ def _score_clip_relevance(clips: list[dict], topic_text: str) -> list[tuple[dict
         ]
         for pat in _AD_PATTERNS:
             if re.search(pat, content):
-                score -= 30  # Heavy penalty for ad-like content
+                score -= 30
 
+        # Popularity boost
         if view_count > 100000:
             score += 5
         elif view_count > 10000:
@@ -1208,23 +1690,139 @@ def _score_clip_relevance(clips: list[dict], topic_text: str) -> list[tuple[dict
     return scored
 
 
-def _extract_search_terms(topic: str, fallback: str) -> str:
-    """Extract short, searchable Chinese keywords from a news topic."""
-    priority_terms = [
-        "特斯拉", "小米", "微软", "谷歌", "OpenAI", "Anthropic", "Claude",
-        "GitHub", "Copilot", "FSD", "全自动驾驶", "自动驾驶", "大模型",
-        "AI助手", "AI编程", "DeepSeek", "软银", "三星", "英伟达",
-    ]
-    found = []
-    remaining = topic
-    for term in priority_terms:
-        if term in remaining:
-            found.append(term)
-            remaining = remaining.replace(term, " ", 1)
-    if found:
-        return " ".join(found[:3])
 
-    short = topic[:20]
+_ENTITY_ALIASES: dict[str, list[str]] = {
+    "月之暗面": ["Kimi", "K3", "Moonshot"],
+    "DeepSeek": ["deepseek", "深度求索"],
+    "OpenAI": ["openai", "GPT"],
+    "Anthropic": ["anthropic", "Claude"],
+    "百度": ["Baidu"],
+    "腾讯": ["Tencent"],
+    "阿里": ["Alibaba", "Qwen"],
+    "华为": ["Huawei"],
+    "小米": ["Xiaomi"],
+    "微软": ["Microsoft", "Copilot"],
+    "谷歌": ["Google", "Gemini"],
+    "Meta": ["LLaMA"],
+    "英伟达": ["NVIDIA"],
+    "字节跳动": ["ByteDance"],
+    "特斯拉": ["Tesla"],
+    "魔法原子": ["MagicAtom"],
+    "CrewAI": ["crewai"],
+    "OpenHuman": ["openhuman"],
+    "DuMate": ["dumate"],
+    "OpenClaw": ["openclaw"],
+    "AutoGPT": ["autogpt"],
+    "Cursor": ["cursor"],
+    "Devin": ["devin"],
+    "Dify": ["dify"],
+    "Coze": ["coze", "扣子"],
+    "ComfyUI": ["comfyui"],
+    "Ollama": ["ollama"],
+    "HuggingFace": ["huggingface"],
+    "GitHub": ["github"],
+    "Gemini": ["gemini"],
+    "Claude": ["claude"],
+    "GPT": ["gpt", "chatgpt"],
+    "LLaMA": ["llama"],
+    "波士顿动力": ["Boston Dynamics", "Atlas", "Spot"],
+}
+_ENTITY_ALIASES_LOWER = {k.lower(): [a.lower() for a in v] for k, v in _ENTITY_ALIASES.items()}
+
+
+def _get_entity_aliases(entity: str) -> list[str]:
+    """Return all known aliases for an entity (company name + product names)."""
+    aliases = [entity]
+    for k, vals in _ENTITY_ALIASES_LOWER.items():
+        if entity.lower() == k or entity.lower() in vals:
+            aliases.extend(vals)
+            if k not in aliases:
+                aliases.append(k)
+            break
+    return list(set(aliases))
+
+
+def _extract_main_entity(topic: str) -> str:
+    """Extract the primary subject (company/product) from a news topic.
+
+    First checks known entities (Chinese entities preferred, then English),
+    then falls back to extracting the first Chinese or English proper noun.
+    """
+    clean = re.sub(r"^新闻[一二三四五六七八九\d]+[：:]\s*", "", topic)
+    # Split known entities into Chinese and English
+    cn_entities = sorted(
+        [e for e in _ENTITY_ALIASES if re.search(r'[一-鿿]', e)],
+        key=len, reverse=True
+    )
+    en_entities = sorted(
+        [e for e in _ENTITY_ALIASES if not re.search(r'[一-鿿]', e)],
+        key=len, reverse=True
+    )
+    # Check Chinese entities first (they're usually the main subject)
+    for ent in cn_entities:
+        if ent in clean:
+            return ent
+    # Then check English entities
+    for ent in en_entities:
+        if ent in clean:
+            return ent
+    # Fallback: extract first Chinese word (2+ chars)
+    cn_match = re.search(r'[一-鿿]{2,}', clean)
+    if cn_match:
+        return cn_match.group()
+    # Try English word (2+ chars)
+    en_match = re.search(r'[A-Za-z]{2,}', clean)
+    if en_match:
+        return en_match.group()
+    return clean[:4] if len(clean) >= 2 else clean
+def _extract_search_terms(topic: str, fallback: str) -> str:
+    """Extract high-quality search keywords from a news topic (domain-agnostic).
+
+    Strategy (in order):
+    1. Known entities from _ENTITY_ALIASES (company/product names)
+    2. Domain context keywords that appear in the topic
+    3. Chinese noun phrases (2+ chars, non-stopword)
+    4. Fallback to domain broll_fallback
+    """
+    # Strip news prefix
+    clean_topic = re.sub(r'^新闻[一二三四五六七八九\d]+[：:]\s*', '', topic)
+
+    found = []
+    remaining = clean_topic
+
+    # Strategy 1: Known entities (longest match first)
+    for entity in sorted(_ENTITY_ALIASES.keys(), key=len, reverse=True):
+        if entity in remaining:
+            found.append(entity)
+            remaining = remaining.replace(entity, " ", 1)
+
+    # Strategy 2: Domain context keywords that appear in topic
+    dc = _get_domain_config()
+    prompt_ctx = dc.get("prompt_context", "")
+    domain_topics = set()
+    for part in re.split(r'[、，,；;。.\s]+', prompt_ctx):
+        part = part.strip()
+        if part and len(part) >= 2:
+            domain_topics.add(part)
+    domain_topics.add(dc["label"])
+    domain_topics.add(dc["display"])
+
+    for dt in sorted(domain_topics, key=len, reverse=True):
+        if dt in remaining and dt not in found:
+            found.append(dt)
+            remaining = remaining.replace(dt, " ", 1)
+
+    if found:
+        return " ".join(found[:4])
+
+    # Strategy 3: Chinese noun phrases from topic
+    cn_words = re.findall(r'[一-鿿]{2,}', clean_topic)
+    cn_words = [w for w in cn_words if w not in _STOPWORDS and len(w) >= 2]
+    if cn_words:
+        return " ".join(cn_words[:3])
+
+    # Strategy 4: First meaningful phrase
+    short = clean_topic[:20]
     for sep in ["，", "、", "：", "。", "；", " ", "的", "在"]:
         idx = short.rfind(sep)
         if idx >= 4:
@@ -1259,34 +1857,45 @@ _PEXELS_NOISE = {
 
 
 def _pexels_clip_is_relevant(clip: dict, topic: str) -> bool:
-    """Check if a Pexels clip is relevant to the news topic.
+    """Check if a Pexels clip is relevant to the news topic (domain-aware).
 
-    Returns False for clearly irrelevant stock footage (cityscapes, food, etc.)
-    and clips whose title has zero overlap with the topic's core terms.
+    Returns False for clearly irrelevant stock footage and clips whose
+    title/description has zero overlap with the topic's core terms
+    AND domain context keywords.
     """
     title = (clip.get("title", "") or "").lower()
     desc = (clip.get("description", "") or "").lower()
     combined = title + " " + desc
 
+    # Build domain-aware noise set: always-irrelevant minus domain overrides
+    dc = _get_domain_config()
+    domain_noise = set(_PEXELS_NOISE)
+    domain_overrides = DOMAIN_IRRELEVANT_OVERRIDES.get(dc["label"], set())
+    domain_noise -= {o.lower() for o in domain_overrides}
+
     # Hard exclude: generic stock footage noise words
-    for noise in _PEXELS_NOISE:
+    for noise in domain_noise:
         if noise in combined:
             return False
 
-    # Soft check: at least one meaningful Chinese keyword from topic in clip text
+    # Build search terms: topic words + domain context keywords
     # Extract 2+ char Chinese words from topic
     topic_cn = set(re.findall(r'[一-鿿]{2,}', topic))
-    # Remove stopwords for relevance check
     topic_terms = topic_cn - _STOPWORDS
-    if not topic_terms:
+
+    # Add domain context keywords for broader matching
+    domain_ctx = _build_domain_context()
+    all_terms = topic_terms | {t.lower() for t in domain_ctx if len(t) >= 2}
+
+    if not all_terms:
         return True  # can't judge, let it through
 
     # Also check English entities from topic
     topic_en = set(re.findall(r'[A-Za-z]{2,}', topic))
 
-    # Check if any topic term appears in clip title/description
-    for term in topic_terms:
-        if term in combined:
+    # Check if any term appears in clip title/description
+    for term in all_terms:
+        if term.lower() in combined:
             return True
     for term in topic_en:
         if term.lower() in combined:
@@ -1302,6 +1911,9 @@ def _extract_rescue_keywords(topic: str) -> list[str]:
     Returns up to 3 keyword strings, from specific to broad.
     Strips the '新闻N：' prefix first.
     """
+    dc = _get_domain_config()
+    broll_fb = dc["broll_fallback"]
+
     # Strip section prefix like "新闻一：", "新闻二："
     clean_topic = re.sub(r'^新闻[一二三四五六七八九\d]+[：:]\s*', '', topic)
 
@@ -1312,18 +1924,19 @@ def _extract_rescue_keywords(topic: str) -> list[str]:
     en_words = re.findall(r'[A-Za-z]{2,}', clean_topic)
     # Longer words first (more specific)
     cn_words.sort(key=len, reverse=True)
-    kw_specific = cn_words[:3] if cn_words else ["AI智能体"]
+    kw_specific = cn_words[:3] if cn_words else [broll_fb]
 
-    # Strategy 2: Add Agent context prefix with extracted keywords
+    # Strategy 2: Add domain context prefix with extracted keywords
+    display = dc["display"]
     if en_words:
-        kw_agent = f"AI智能体 {' '.join(kw_specific[:2])} {' '.join(en_words[:2])}"
+        kw_agent = f"{display} {' '.join(kw_specific[:2])} {' '.join(en_words[:2])}"
     else:
-        kw_agent = f"AI智能体 {' '.join(kw_specific[:2])}"
+        kw_agent = f"{display} {' '.join(kw_specific[:2])}"
 
-    # Strategy 3: Broad Agent-focused fallback (more specific than generic AI)
-    kw_broad = "AI Agent 智能体 编程开发 开源软件"
+    # Strategy 3: Broad domain fallback
+    kw_broad = broll_fb
 
-    return [kw_agent, kw_broad, "AI technology agent"]
+    return [kw_agent, kw_broad, broll_fb]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1373,7 +1986,7 @@ async def _fetch_intro_background(video_dir: Path) -> str | None:
     try:
         search_url = "https://api.pexels.com/videos/search"
         params = {
-            "query": "artificial intelligence technology digital data",
+            "query": _get_domain_config()["pexels_query"],
             "per_page": 5,
             "orientation": "landscape",
             "size": "medium",
@@ -1424,7 +2037,7 @@ async def _fetch_intro_background(video_dir: Path) -> str | None:
 
 
 def _generate_title_card(output_path: str, today: str, duration_sec: float,
-                         background_video: str | None = None, title_text: str = "AI 智能体领域早报",
+                         background_video: str | None = None, title_text: str | None = None,
                          subtitle_text: str | None = None, font_size: int = 72) -> None:
     """Title/closing card: Pillow text overlay on Pexels/gradient background."""
     dur = max(duration_sec, 3.0)
@@ -1461,6 +2074,8 @@ def _generate_title_card(output_path: str, today: str, duration_sec: float,
     draw.rectangle([0, 0, 1920, 5], fill=accent_color)
     draw.rectangle([0, 1075, 1920, 1080], fill=accent_color)
 
+    if title_text is None:
+        title_text = f"{_get_domain_config()['display']}早报"
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     tx = (1920 - tw) // 2
@@ -1593,6 +2208,77 @@ def _generate_placeholder(output_path: str, duration_sec: float) -> None:
         "-t", f"{dur:.1f}", output_path,
     ]
     _sp.run(cmd, capture_output=True, timeout=30, encoding="utf-8", errors="replace")
+
+
+def _generate_news_section_card(output_path: str, title_text: str,
+                                 duration_sec: float = 1.5) -> None:
+    """Short solid-colour card with centred headline — for per-news titles."""
+    dur = max(duration_sec, 0.8)
+
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        _generate_solid_card(output_path, dur)
+        return
+
+    font_paths = [
+        "C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/msyhbd.ttc",
+        "C:/Windows/Fonts/simhei.ttf", "C:/Windows/Fonts/simsun.ttc",
+    ]
+    font = None
+    for fp in font_paths:
+        if Path(fp).exists():
+            try:
+                font = ImageFont.truetype(fp, 48)
+                break
+            except Exception:
+                continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    overlay = Image.new("RGBA", (1920, 1080), (10, 10, 30, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    # Top accent line
+    draw.rectangle([0, 0, 1920, 4], fill=(58, 123, 213, 200))
+
+    # Centred title
+    bbox = draw.textbbox((0, 0), title_text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    tx = (1920 - tw) // 2
+    ty = (1080 - th) // 2
+    draw.text((tx + 2, ty + 2), title_text, font=font, fill=(0, 0, 0, 80))
+    draw.text((tx, ty), title_text, font=font, fill=(255, 255, 255, 240))
+
+    # Decorative line below title
+    line_y = ty + th + 16
+    draw.rectangle([(1920 - 100) // 2, line_y, (1920 + 100) // 2, line_y + 2],
+                   fill=(58, 123, 213, 180))
+
+    overlay_path = str(Path(output_path).parent / f"_sec_{Path(output_path).stem}.png")
+    overlay.save(overlay_path, "PNG")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", f"color=c=0x0f0f23:s=1920x1080:r=30:d={dur:.2f}",
+        "-i", overlay_path,
+        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+        "-filter_complex", "[0:v][1:v]overlay=0:0",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+        "-c:a", "aac", "-b:a", "1k", "-pix_fmt", "yuv420p",
+        "-t", f"{dur:.2f}", output_path,
+    ]
+
+    result = _sp.run(cmd, capture_output=True, text=True, timeout=30,
+                     encoding="utf-8", errors="replace")
+    try:
+        Path(overlay_path).unlink()
+    except Exception:
+        pass
+
+    if result.returncode != 0:
+        logger.warning("News section card failed: %s", (result.stderr or "")[:300])
+        _generate_solid_card(output_path, dur)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

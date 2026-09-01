@@ -1,0 +1,26 @@
+<view class="container">
+  <view class="player-wrap">
+    <video
+      class="video-player"
+      src="{{videoUrl}}"
+      poster="{{coverUrl}}"
+      controls
+      autoplay
+      show-center-play-btn
+      show-fullscreen-btn
+      show-play-btn
+      enable-progress-gesture
+      object-fit="contain"
+      binderror="onVideoError"
+      bindended="onVideoEnd"
+    />
+
+    <view class="info-bar">
+      <text class="info-title">{{title}}</text>
+      <text class="info-duration" wx:if="{{duration}}">{{duration}}秒</text>
+      <button class="info-share" open-type="share" size="mini">
+        🔗 分享
+      </button>
+    </view>
+  </view>
+</view>

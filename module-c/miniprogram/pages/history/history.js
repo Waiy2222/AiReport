@@ -18,15 +18,46 @@ Page({
     filterTag: "",     // 标签筛选
     tags: [],          // 可用标签列表
     showTagPicker: false,
-    briefType: "",     // "" | "personalized" | "general" — 简报类型筛选
+    briefType: "",     // 已废弃 — 我的报道和通用简报合为"简报"
   },
 
   onLoad(options) {
     if (options && options.keyword) {
       this.setData({ keyword: decodeURIComponent(options.keyword) });
     }
+    // 从「我的」页面跳转时自动筛选专属简报
+    const app = getApp();
+    if (app.globalData.historyFilter === 'personalized') {
+      this.setData({ briefType: 'personalized' });
+      app.globalData.historyFilter = null;
+    }
     this.fetchTags();
     this.fetchList();
+  },
+
+  onShow() {
+    // 首次加载由 onLoad 处理
+    if (!this._init) { this._init = true; return; }
+    // 切回 tab 时：保留当前列表，后台静默刷新首页
+    this._refreshSilent();
+  },
+
+  async _refreshSilent() {
+    // 静默拉取首页数据，成功则替换，失败保留原列表
+    const filters = { type: this.data.filterType, dateFrom: "", dateTo: "", tag: this.data.filterTag };
+    try {
+      const data = await api.getBriefingHistory(1, 10, this.data.keyword, filters);
+      const items = data.items.map((item) => ({
+        ...item,
+        dateText: formatDate(item.date),
+        tags: item.is_personalized
+          ? (item.interest_tags || []).slice(0, 5)
+          : [...new Set((item.sections || []).map(s => s.tag).filter(t => t && t !== '综合'))].slice(0, 5),
+      }));
+      this.setData({ list: items, total: data.total, noMore: items.length >= data.total });
+    } catch (e) {
+      // 静默失败，保留旧数据
+    }
   },
 
   onPullDownRefresh() {
@@ -178,12 +209,14 @@ Page({
         dateText: formatDate(item.date),
         timeAgoText: timeAgo(item.generated_at),
         tlDrPreview: (item.tl_dr || []).slice(0, 4),
-        // Extract unique tags from sections
-        tags: [...new Set(
-          (item.sections || [])
-            .map(s => s.tag)
-            .filter(t => t && t !== '综合')
-        )].slice(0, 5),
+        // 专属简报用 interest_tags，通用简报从 sections 提取
+        tags: item.is_personalized
+          ? (item.interest_tags || []).slice(0, 5)
+          : [...new Set(
+              (item.sections || [])
+                .map(s => s.tag)
+                .filter(t => t && t !== '综合')
+            )].slice(0, 5),
       }));
 
       const list =

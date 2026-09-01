@@ -11,26 +11,32 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path(os.getenv("VIDEO_OUTPUT_DIR", "./output")).resolve()
-# Default: lively young female voice with cheerful style — sounds much more
-# natural than the old newscast-style XiaoxiaoNeural at +8%.
-TTS_VOICE = os.getenv("TTS_VOICE", "zh-CN-XiaoyiNeural")
-TTS_RATE = os.getenv("TTS_RATE", "+3%")
-TTS_STYLE = os.getenv("TTS_STYLE", "cheerful")  # cheerful/friendly/newscast/serious/calm
+# Default: YunjianNeural — male, passionate (激情), most energetic zh-CN voice.
+# +15% rate with +3Hz pitch for bright, lively short-video delivery.
+TTS_VOICE = os.getenv("TTS_VOICE", "zh-CN-YunjianNeural")
+TTS_RATE = os.getenv("TTS_RATE", "+8%")
+TTS_STYLE = os.getenv("TTS_STYLE", "newscast")
 
 
 class TTSEngine:
     """Edge TTS wrapper for Chinese voiceover generation with SSML emotion."""
 
     VOICES = {
-        "zh-CN-XiaoxiaoNeural": "Female, warm, natural (legacy default)",
-        "zh-CN-XiaoyiNeural": "Female, lively, young (current default)",
-        "zh-CN-YunxiNeural": "Male, professional, news-style",
-        "zh-CN-YunjianNeural": "Male, deep, narration",
+        # === Female voices ===
+        "zh-CN-XiaoxiaoNeural": "Female, warm, gentle (温柔)",
+        "zh-CN-XiaoyiNeural": "Female, lively, young (活泼) ★ default",
+        # === Male voices ===
+        "zh-CN-YunxiNeural": "Male, lively, sunshine (清朗阳光)",
+        "zh-CN-YunjianNeural": "Male, passionate, intense (激情) ★ default",
+        "zh-CN-YunyangNeural": "Male, professional, reliable (专业可靠)",
+        "zh-CN-YunxiaNeural": "Male, cute, cartoon-style (可爱)",
+        # === Dialect ===
+        "zh-CN-liaoning-XiaobeiNeural": "Female, Liaoning dialect (辽宁)",
+        "zh-CN-shaanxi-XiaoniNeural": "Female, Shaanxi dialect (陕西)",
     }
 
     # XiaoyiNeural supports: chat, cheerful, customerservice, empathetic,
@@ -46,6 +52,110 @@ class TTSEngine:
 
     def __init__(self):
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        self._chattts = None  # lazy load
+
+    async def generate(
+        self,
+        text: str,
+        output_path: str | None = None,
+        voice: str | None = None,
+        style: str | None = None,
+        rate: str | None = None,
+    ) -> str | None:
+        """Generate audio from text (no subtitle timing data).
+
+        Primary: ChatTTS (natural Chinese with emotion, no robotic sound).
+        Fallback: edge-tts CLI (reliable, always works).
+        """
+        voice = voice or TTS_VOICE
+        style = style or TTS_STYLE
+        rate = rate or TTS_RATE
+
+        if output_path is None:
+            import uuid
+            output_path = str(OUTPUT_DIR / f"voiceover_{uuid.uuid4().hex[:8]}.mp3")
+
+        # Primary: ChatTTS for natural Chinese speech
+        chattts_result = await self._chattts_generate(text, output_path, rate)
+        if chattts_result:
+            return chattts_result
+
+        # Fallback: edge-tts CLI
+        logger.info("ChatTTS 不可用 → 回退到 edge-tts")
+        return await self._edge_generate(text, output_path, voice, rate)
+
+    async def generate_with_subs(
+        self,
+        text: str,
+        output_path: str | None = None,
+        voice: str | None = None,
+        style: str | None = None,
+        rate: str | None = None,
+    ) -> tuple[str | None, str | None]:
+        """Generate audio + word-level VTT subtitles from the TTS engine.
+
+        Returns (audio_path, vtt_path) — VTT contains phrase-level timestamps
+        directly from the TTS synthesis engine, giving PERFECT voice sync.
+        Fallback (ChatTTS/mock): audio only, no subtitles → returns (path, None).
+        """
+        voice = voice or TTS_VOICE
+        style = style or TTS_STYLE
+        rate = rate or TTS_RATE
+
+        if output_path is None:
+            import uuid
+            output_path = str(OUTPUT_DIR / f"voiceover_{uuid.uuid4().hex[:8]}.mp3")
+
+        # ChatTTS doesn't support word timestamps — edge-tts needed for sync
+        # So skip ChatTTS when we need subtitles
+        return await self._edge_generate_with_subs(text, output_path, voice, rate)
+
+    async def _edge_generate_with_subs(
+        self, text: str, output_path: str, voice: str, rate: str,
+    ) -> tuple[str | None, str | None]:
+        """Generate audio + VTT subtitles via edge-tts CLI."""
+        import subprocess
+        import tempfile
+
+        vtt_path = output_path.rsplit(".", 1)[0] + ".vtt"
+        tmp_text = tempfile.mktemp(suffix=".txt")
+        try:
+            with open(tmp_text, "w", encoding="utf-8") as f:
+                f.write(text)
+
+            cmd = [
+                "edge-tts",
+                "--voice", voice,
+                "--rate", rate,
+                "--pitch=+3Hz",
+                "-f", tmp_text,
+                "--write-media", output_path,
+                "--write-subtitles", vtt_path,
+            ]
+            result = subprocess.run(
+                cmd, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=120,
+            )
+
+            if result.returncode != 0:
+                logger.warning("Edge TTS CLI failed: %s",
+                               (result.stderr or "")[:300])
+                # Try without subtitles as fallback
+                return await self._edge_generate(text, output_path, voice, rate), None
+
+            logger.info("TTS + subs generated (%s, %s): %s", voice, rate, output_path)
+            return output_path, vtt_path if Path(vtt_path).exists() else None
+        except FileNotFoundError:
+            logger.warning("edge-tts not installed")
+            return None, None
+        except Exception:
+            logger.exception("TTS CLI failed")
+            return None, None
+        finally:
+            try:
+                Path(tmp_text).unlink()
+            except Exception:
+                pass
 
     async def generate(
         self,
@@ -57,8 +167,8 @@ class TTSEngine:
     ) -> str | None:
         """Generate audio from text.
 
-        Primary path: Python edge-tts Communicate API with SSML (emotion + pauses).
-        Fallback: CLI plain-text mode (no SSML, but works everywhere).
+        Primary: ChatTTS (natural Chinese with emotion, no robotic sound).
+        Fallback: edge-tts CLI (reliable, always works).
         """
         voice = voice or TTS_VOICE
         style = style or TTS_STYLE
@@ -68,16 +178,90 @@ class TTSEngine:
             import uuid
             output_path = str(OUTPUT_DIR / f"voiceover_{uuid.uuid4().hex[:8]}.mp3")
 
-        # Try SSML path first (supports emotion style + natural pauses)
-        ssml_result = await self._ssml_generate(text, output_path, voice, style, rate)
-        if ssml_result:
-            return ssml_result
+        # Primary: ChatTTS for natural Chinese speech
+        chattts_result = await self._chattts_generate(text, output_path, rate)
+        if chattts_result:
+            return chattts_result
 
-        # Fallback: CLI plain-text mode
-        logger.info("SSML path unavailable — falling back to CLI plain-text TTS")
-        return await self._cli_generate(text, output_path, voice)
+        # Fallback: edge-tts CLI
+        logger.info("ChatTTS 不可用 → 回退到 edge-tts")
+        return await self._edge_generate(text, output_path, voice, rate)
 
-    # ---- Primary path: edge-tts CLI (reliable, no SSML shenanigans) ------
+    # ---- ChatTTS: natural Chinese speech with emotion --------------------
+
+    async def _chattts_generate(
+        self, text: str, output_path: str, rate: str,
+    ) -> str | None:
+        """Generate speech using ChatTTS — natural, emotional Chinese TTS."""
+        try:
+            import torch
+            import chattts
+        except ImportError:
+            return None
+
+        try:
+            if self._chattts is None:
+                logger.info("ChatTTS: 加载模型...")
+                chat = chattts.Chat()
+                chat.load(compile=False)
+                self._chattts = chat
+                logger.info("ChatTTS: 模型就绪")
+
+            # Parse rate: +15% → speed factor 1.15
+            rate_val = 1.0
+            if rate:
+                try:
+                    rate_val = 1.0 + int(rate.strip("+%")) / 100.0
+                except ValueError:
+                    rate_val = 1.0
+
+            # Generate wav
+            wav_path = output_path.rsplit(".", 1)[0] + ".wav"
+            params = {
+                "text": [text],
+                "skip_refine_text": True,
+                "do_text_normalization": True,
+            }
+            import numpy as np
+            import soundfile as sf
+
+            wavs = self._chattts.infer(params, use_decoder=True)
+            if wavs and len(wavs) > 0:
+                audio = wavs[0]
+                # Apply speed via resampling if needed
+                sf.write(wav_path, audio, 24000)
+
+                # Convert wav → mp3 with ffmpeg
+                import subprocess
+                cmd = [
+                    "ffmpeg", "-y", "-i", wav_path,
+                    "-codec:a", "libmp3lame", "-b:a", "192k",
+                    output_path,
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30,
+                                        encoding="utf-8", errors="replace")
+                try:
+                    Path(wav_path).unlink()
+                except Exception:
+                    pass
+
+                if result.returncode == 0 and Path(output_path).exists():
+                    logger.info("ChatTTS 生成: %s", output_path)
+                    return output_path
+
+            logger.warning("ChatTTS: 生成失败，回退 edge-tts")
+            return None
+        except Exception:
+            logger.exception("ChatTTS: 异常")
+            return None
+
+    # ---- Edge TTS: reliable fallback ------------------------------------
+
+    async def _edge_generate(
+        self, text: str, output_path: str, voice: str, rate: str,
+    ) -> str | None:
+        """Generate via edge-tts CLI (reliable, always works)."""
+        return await self._ssml_generate(text, output_path, voice, "newscast", rate)
 
     async def _ssml_generate(
         self,
@@ -105,7 +289,7 @@ class TTSEngine:
                 "edge-tts",
                 "--voice", voice,
                 "--rate", rate,
-                "--pitch=-2Hz",  # slightly lower pitch → warmer tone (use = to avoid flag parsing)
+                "--pitch=+3Hz",  # slightly brighter for energy
                 "-f", tmp_text,
                 "--write-media", output_path,
             ]
@@ -121,45 +305,6 @@ class TTSEngine:
 
             logger.info("TTS generated (%s, %s, %s): %s",
                         voice, style, rate, output_path)
-            return output_path
-        except FileNotFoundError:
-            logger.warning("edge-tts not installed. Run: pip install edge-tts")
-            return self._mock_audio(text, output_path)
-        except Exception:
-            logger.exception("TTS CLI failed")
-            return None
-        finally:
-            try:
-                Path(tmp_text).unlink()
-            except Exception:
-                pass
-
-    async def _cli_generate(self, text: str, output_path: str, voice: str) -> str | None:
-        """Generate TTS via edge-tts CLI (plain text, no style).  Last-resort fallback."""
-        import subprocess
-        import tempfile
-
-        tmp_text = tempfile.mktemp(suffix=".txt")
-        try:
-            with open(tmp_text, "w", encoding="utf-8") as f:
-                f.write(text)
-
-            cmd = [
-                "edge-tts",
-                "--voice", voice,
-                "--rate", TTS_RATE,
-                "-f", tmp_text,
-                "--write-media", output_path,
-            ]
-            result = subprocess.run(
-                cmd, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", timeout=120,
-            )
-
-            if result.returncode != 0:
-                logger.warning("Edge TTS CLI failed: %s", (result.stderr or "")[:300])
-                return self._mock_audio(text, output_path)
-            logger.info("TTS generated (CLI fallback): %s", output_path)
             return output_path
         except FileNotFoundError:
             logger.warning("edge-tts not installed. Run: pip install edge-tts")

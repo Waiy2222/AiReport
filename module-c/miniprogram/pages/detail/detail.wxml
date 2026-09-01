@@ -9,8 +9,8 @@
     </view>
 
     <!-- TL;DR 要点 -->
-    <view class="section-block">
-      <view class="section-title">TL;DR 要点</view>
+    <view wx:if="{{briefing.tl_dr && briefing.tl_dr.length > 0}}" class="section-block">
+      <view class="section-title">今日要点</view>
       <view
         wx:for="{{briefing.tl_dr}}"
         wx:key="*this"
@@ -97,7 +97,7 @@
     </view>
 
     <!-- 关键趋势 -->
-    <view wx:if="{{briefing.key_takeaways.length > 0}}" class="section-block takeaways">
+    <view wx:if="{{briefing.key_takeaways && briefing.key_takeaways.length > 0}}" class="section-block takeaways">
       <view class="section-title">关键趋势信号</view>
       <view
         wx:for="{{briefing.key_takeaways}}"

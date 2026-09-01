@@ -69,4 +69,13 @@ Page({
     const path = `briefing.sections[${section}].items[${index}]._imgHide`;
     this.setData({ [path]: true });
   },
+
+  // 分享
+  onShareAppMessage() {
+    const b = this.data.briefing;
+    return {
+      title: `${this.data.dateText} ${this.data.typeText} — AI 资讯简报`,
+      path: `/pages/detail/detail?id=${b.id}`,
+    };
+  },
 });

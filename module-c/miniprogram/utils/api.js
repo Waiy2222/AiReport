@@ -91,22 +91,18 @@ module.exports = {
   },
 
   // Phase 3 趋势接口
-  getWeeklyTrends() {
-    return request("/api/trends/weekly");
+  getWeeklyTrends(tags, openid) {
+    const params = [];
+    if (tags && tags.length) params.push(`tags=${tags.join(',')}`);
+    if (openid) params.push(`openid=${openid}`);
+    const qs = params.length ? `?${params.join('&')}` : '';
+    return request(`/api/trends/weekly${qs}`);
   },
 
   getTagTrend(tag) {
     return request(`/api/trends/tag/${encodeURIComponent(tag)}`);
   },
 
-  // Chat 对话接口
-  chatSend(message) {
-    return request("/api/chat/send", "POST", { message });
-  },
-
-  getChatSuggestions() {
-    return request("/api/chat/suggestions");
-  },
 
   // 个性化简报
   generateBriefing(openid, interestText, tags, type) {
@@ -122,12 +118,46 @@ module.exports = {
     return request(`/api/briefings/generate/${encodeURIComponent(taskId)}`);
   },
 
+  getMyLatestBriefing(openid, type) {
+    return request(
+      `/api/briefings/my/latest?openid=${encodeURIComponent(openid || "anonymous")}&type=${encodeURIComponent(type || "morning")}`
+    );
+  },
+
   getMyBriefings(openid, page, size) {
     const p = page || 1;
     const s = size || 20;
     return request(
       `/api/briefings/my?openid=${encodeURIComponent(openid || "anonymous")}&page=${p}&size=${s}`
     );
+  },
+
+  // 视频生成
+  generateVideo(keyword, openid) {
+    return request("/api/videos/generate", "POST", {
+      keyword: keyword || "",
+      openid: openid || "anonymous",
+    });
+  },
+
+  getVideoStatus(videoId) {
+    return request(`/api/videos/status/${encodeURIComponent(videoId)}`);
+  },
+
+  getVideoList(page, size) {
+    const p = page || 1;
+    const s = size || 10;
+    return request(`/api/videos/list?page=${p}&size=${s}`);
+  },
+
+  getVideoFileUrl(videoId) {
+    const baseUrl = app.globalData.baseUrl || config.baseUrl;
+    return `${baseUrl}/api/videos/${encodeURIComponent(videoId)}/file`;
+  },
+
+  getVideoCoverUrl(videoId) {
+    const baseUrl = app.globalData.baseUrl || config.baseUrl;
+    return `${baseUrl}/api/videos/${encodeURIComponent(videoId)}/cover`;
   },
 
 };
